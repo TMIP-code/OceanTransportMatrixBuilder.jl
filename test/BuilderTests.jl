@@ -1,12 +1,15 @@
 
 
-@testitem "building matrices" default_imports=false begin
-    using Pkg
-    Pkg.activate(@__DIR__)
-    Pkg.instantiate()
-    Pkg.resolve()
-    using OceanTransportMatrixBuilder
-    using Test
+# @testitem "building matrices" default_imports=false begin
+@testitem "building matrices" begin
+    # Uncomment if running interactively in the REPL within the test/ directory
+    # using Pkg
+    # Pkg.activate(@__DIR__)
+    # Pkg.instantiate()
+    # Pkg.resolve()
+
+    # using OceanTransportMatrixBuilder
+    # using Test
     using NetCDF
     using YAXArrays
     using Unitful
@@ -40,14 +43,10 @@
     volcello_ds = open_dataset(joinpath(inputdir, "volcello.nc"))
     areacello_ds = open_dataset(joinpath(inputdir, "areacello.nc"))
 
-    umo = umo_ds["umo"] |> Array{Float64}
-    vmo = vmo_ds["vmo"] |> Array{Float64}
     mlotst = mlotst_ds["mlotst"] |> Array{Float64}
-    volcello = volcello_ds["volcello"] |> Array{Union{Missing, Float64}}
-    areacello = areacello_ds["areacello"] |> Array{Float64}
 
     # Make ualldirs
-    u = makeualldirections(; umo, vmo)
+    u = makeualldirections(; umo_ds, vmo_ds)
 
     # Make makemodelgrid
     modelgrid = makemodelgrid(; areacello_ds, volcello_ds, mlotst_ds)
@@ -62,8 +61,6 @@
         κVML = 0.1, # m^2/s
         κVdeep = 1e-5, # m^2/s
     )
-
-
 
 	# Check divergence and mass conservation
 
@@ -83,5 +80,13 @@
 		τvol = ustrip(Myr, norm(v) / norm(Ttest' * v) * s)
 		@info "    vol: $(round(τvol, sigdigits=2)) Myr"
 	end
+
+    # tests if diagonal elements are > 0 and off-diagonal are < 0.
+    diagT = sparse(Diagonal(T))
+
+    @test all(diagT.nzval .> 0)
+    @test all((T - diagT).nzval .< 0)
+
+
 
 end

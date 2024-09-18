@@ -1,7 +1,3 @@
-using OceanTransportMatrixBuilder
-using Test
+using TestItemRunner
 
-@testset "XXX" begin
-
-
-end
+@run_package_tests verbose=true

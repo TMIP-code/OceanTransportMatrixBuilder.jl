@@ -1,6 +1,0 @@
-[deps]
-NetCDF = "30363a11-5582-574a-97bb-aa9a979735b9"
-OceanTransportMatrixBuilder = "c2b4a04e-6049-4fc4-aa6a-5508a29a1e1c"
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
-YAXArrays = "c21b50f5-aa40-41ea-b809-c0f5e47bfa5c"

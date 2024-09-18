@@ -1,6 +1,9 @@
 
 
-function makeualldirections(; umo, vmo)
+function makeualldirections(; umo_ds, vmo_ds)
+
+    umo = umo_ds["umo"] |> Array{Float64}
+    vmo = vmo_ds["vmo"] |> Array{Float64}
 
 	iseastborder = isnan.(umo[[2:end;1],:,:]) .& .!isnan.(umo)
 	isnorthborder = isnan.([vmo[:,2:end,:] vmo[end:-1:1,end:end,:]]) .& .!isnan.(vmo)

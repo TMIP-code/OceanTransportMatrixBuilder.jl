@@ -161,19 +161,6 @@ end
 
 
 
-"""
-tests if diagonal elements are > 0 and off-diagonal are < 0.
-"""
-function isdivergence(T)
-    diagT = sparse(Diagonal(T))
-
-    @show posdiag = all(diagT.nzval .> 0)
-    @show negoffdiag = all((T - diagT).nzval .< 0)
-
-    posdiag & negoffdiag
-end
-
-
 
 
 
