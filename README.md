@@ -11,7 +11,7 @@ The purpose of this package is to build transport matrices from standard CMIP mo
 ## Context
 
 By rearranging the 3D grid of the ocean into a vector, the divergence of the flow of any tracer can be conveniently expressed in matrix form.
-That is, for the vector $\boldsymbol{x}$ representing the 3D tracer concentrations $\chi$, the divergence of the flow is linear in $\chi$ and can be conveniently represented by $\mathbf{T}\,\boldsymbol{x}$ as a transport matrix $\mathbf{T}$ acting on $\boldsymbol{x}$.
+That is, for the vector $\boldsymbol{x}$ representing the 3D tracer concentrations $\chi$, the divergence of the flow is linear in $\chi$ and can be conveniently represented by $\mathbf{T}\boldsymbol{x}$ as a transport matrix $\mathbf{T}$ acting on $\boldsymbol{x}$.
 
 These matrices are useful in a number of contexts, e.g., for avoiding spin ups, optimization, or novel diagnostics[^1].
 The motivation for writing this package is to be able to easily compute diagnostics and compare them across CMIP models.
@@ -59,7 +59,8 @@ indices = makeindices(modelgrid.v3D)
 
 That's it! You've got yourself the transport matrix of your dreams!
 
-| ***Note***: This is work in progress, so expect breaking changes in the interface. However, the `test/` directory should contain up-to-date example for building the transport matrix.
+> [!WARNING]  
+> This is work in progress, so expect breaking changes in the interface. However, the `test/` directory should contain up-to-date example for building the transport matrix.
 
 ## Acknowledgements
 
