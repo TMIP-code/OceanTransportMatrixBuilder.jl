@@ -1,7 +1,7 @@
 
 
 # @testitem "building matrices" default_imports=false begin
-@testitem "building matrices" begin
+@testitem "building matrices" tags=[:skipci] begin
     # Uncomment if running interactively in the REPL within the test/ directory
     # using Pkg
     # Pkg.activate(@__DIR__)

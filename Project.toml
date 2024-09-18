@@ -19,6 +19,9 @@ TestItemRunner = "f8b46487-2199-4994-9208-9a1283c18c0a"
 TestItems = "1c621080-faea-4a02-84b6-bbd5e436b8fe"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 YAXArrays = "c21b50f5-aa40-41ea-b809-c0f5e47bfa5c"
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Zarr = "0a941bbe-ad1d-11e8-39d9-ab76183a1d99"
 
 [targets]
-test = ["LinearAlgebra", "NetCDF", "Test", "TestItemRunner", "TestItems", "Unitful", "YAXArrays"]
+test = ["LinearAlgebra", "NetCDF", "Test", "TestItemRunner", "TestItems", "Unitful", "YAXArrays", "CSV", "DataFrames", "Zarr"]

@@ -2,6 +2,8 @@
 
 function makeualldirections(; umo_ds, vmo_ds)
 
+    FillValue = umo_ds["umo"].properties["_FillValue"]
+
     umo = umo_ds["umo"] |> Array{Float64}
     vmo = vmo_ds["vmo"] |> Array{Float64}
 
@@ -11,12 +13,12 @@ function makeualldirections(; umo_ds, vmo_ds)
 	vmo[isnorthborder] .= 0
 
 	@info "Making ueast and uwest"
-	ueast = replace(umo, NaN=>0.0) .|> Float64
+	ueast = replace(umo, NaN=>0.0, FillValue=>0.0) .|> Float64
 	uwest = ueast[[end;1:end-1],:,:] .|> Float64
 
 	@info "Making vnorth and vsouth"
 	# Check that south pole vnorth is zero (so that it causes no issues with circular shift)
-	vnorth = replace(vmo, NaN=>0.0) .|> Float64
+	vnorth = replace(vmo, NaN=>0.0, FillValue=>0.0) .|> Float64
 	vsouth = vnorth[:,[end;1:end-1],:] .|> Float64
 
 	@info "Making wtop and wbottom"
@@ -53,20 +55,35 @@ end
 
 function makemodelgrid(; areacello_ds, volcello_ds, mlotst_ds)
 
-    areacello = areacello_ds["areacello"] |> Array{Float64}
-    volcello = volcello_ds["volcello"] |> Array{Union{Missing, Float64}}
+	# volume (3D)
+    volcello = volcello_ds["volcello"]
+    FillValue = volcello.properties["_FillValue"]
+    v3D = volcello |> Array{Union{Missing, Float64}}
+	v3D = replace(v3D, missing => NaN, 0 => NaN, FillValue => NaN)
 
-	# area and volume
-	v3D = replace(volcello, missing => NaN, 0 => NaN)
-    area2D = replace(areacello, missing => NaN, 0 => NaN)
+    # area (2D)
+    areacello = areacello_ds["areacello"]
+    FillValue = areacello.properties["_FillValue"]
+    area2D = areacello |> Array{Float64}
+    area2D = replace(area2D, missing => NaN, 0 => NaN, FillValue => NaN)
 
-	# depth and cell height
+	# depth and cell height (3D)
 	DZT3d = v3D ./ area2D
 	zt = volcello_ds["lev"] |> Array
-    lat = volcello_ds["lat"] |> Array
-    lon = volcello_ds["lon"] |> Array
-    lon_vertices = mlotst_ds["lon_verticies"] |> Array # <- typo from xmip (https://github.com/jbusecke/xMIP/issues/369)
-    lat_vertices = mlotst_ds["lat_verticies"] |> Array # <- typo from xmip (https://github.com/jbusecke/xMIP/issues/369)
+    volcello_variable_names = propertynames(volcello_ds) .|> string
+    # In order for the online CI test to pass, I must do some of the xmip work myself...
+    # lat_var_name is the shortest string in volcello_variable_names that contains "lat"
+    lat_var_name = first(sort(filter(x -> occursin("lat", x), volcello_variable_names), by=length))
+    lat = volcello_ds[lat_var_name] |> Array
+    # same with lon
+    lon_var_name = first(sort(filter(x -> occursin("lon", x), volcello_variable_names), by=length))
+    lon = volcello_ds[lon_var_name] |> Array
+    # same with lon_vertices
+    mlotst_variable_names = propertynames(mlotst_ds) .|> string
+    lon_vertices_var_name = first(sort(filter(x -> occursin("lon", x) && occursin("vert", x), mlotst_variable_names), by=length))
+    lat_vertices_var_name = first(sort(filter(x -> occursin("lat", x) && occursin("vert", x), mlotst_variable_names), by=length))
+    lon_vertices = mlotst_ds[lon_vertices_var_name] |> Array # <- typo from xmip (https://github.com/jbusecke/xMIP/issues/369)
+    lat_vertices = mlotst_ds[lat_vertices_var_name] |> Array # <- typo from xmip (https://github.com/jbusecke/xMIP/issues/369)
 
     C = CartesianIndices(size(lon))
 

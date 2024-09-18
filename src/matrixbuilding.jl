@@ -147,7 +147,7 @@ Return the sparse (i, j, v) for the upwind advection operator Tadv.
 function upwind_advection_operator_sparse_entries(; u, modelgrid, indices, ρ)
 
     # Unpack model grid
-    (; v3D, ) = modelgrid
+    (; v3D,) = modelgrid
     # Unpack indices
     (; wet3D, Lwet, Lwet3D, C) = indices
 
@@ -165,6 +165,7 @@ function upwind_advection_operator_sparse_entries(; u, modelgrid, indices, ρ)
 		if ϕ > 0
 			i′ = mod1(i - 1, nx)
 			𝑗 = Lwet3D[i′,j,k]
+			ismissing(𝑗) && @show(i, j, k, i′)
 			m𝑗 = v3D[i′,j,k] * ρ
 			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕ, m𝑖, m𝑗)
 		end
