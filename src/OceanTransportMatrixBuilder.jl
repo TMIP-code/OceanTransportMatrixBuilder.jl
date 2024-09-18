@@ -1,7 +1,18 @@
 module OceanTransportMatrixBuilder
 
-using ProgressMeter
+# stdlibs
+using SparseArrays
 
-include("tools.jl")
+# deps
+using ProgressMeter: @showprogress
+using Distances: haversine
+
+include("preprocessing.jl")
+include("matrixbuilding.jl")
+
+export makeualldirections
+export makemodelgrid
+export makeindices
+export transportmatrix
 
 end

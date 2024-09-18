@@ -1,10 +1,12 @@
 name = "OceanTransportMatrixBuilder"
 uuid = "c2b4a04e-6049-4fc4-aa6a-5508a29a1e1c"
 authors = ["Benoit Pasquier <briochemc@gmail.com> and contributors"]
-version = "1.0.0-DEV"
+version = "0.1.0"
 
 [deps]
+Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
 julia = "1.6.7"
