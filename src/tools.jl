@@ -93,31 +93,6 @@ end
 
 
 
-"""
-	edges = edges_from_midpoints(midpoints, lims)
-
-returns the edges given the midpoints and limits
-using backslash. That is, the least squares solution of
-
-	midpoints = (edges[1:end-1] + edges[2:end]) / 2
-	edges[1] = lims[1]
-	edges[end] = lims[2]
-    diff()
-"""
-function edges_from_midpoints(midpoints, lims)
-    # TODO this creates noisy diffs so maybe worth
-    # including a smoothing parameter for the diff?
-    # Also not sure I actually really need these at all
-    N = length(midpoints)
-    I = sparse(Diagonal(ones(N)))
-    I_left = [I zeros(N)]
-    I_right = [zeros(N) I]
-    A = (I_left + I_right) / 2
-    M = [A; 1 zeros(1, N); zeros(1, N) 1]
-	return M \ [midpoints; collect(lims)]
-end
-
-
 
 
 

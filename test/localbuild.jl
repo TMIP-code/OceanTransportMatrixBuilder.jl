@@ -1,35 +1,12 @@
 
 
-# @testitem "building matrices" default_imports=false begin
-@testitem "building matrices" tags=[:skipci] begin
-    # Uncomment if running interactively in the REPL within the test/ directory
-    # using Pkg
-    # Pkg.activate(@__DIR__)
-    # Pkg.instantiate()
-    # Pkg.resolve()
 
-    # using OceanTransportMatrixBuilder
-    # using Test
+@testmodule LocalBuild begin
+
+    using Test
+    using OceanTransportMatrixBuilder
     using NetCDF
     using YAXArrays
-    using Unitful
-    using Unitful: cm, m, km, kg, s, d, yr, Myr, hr # Some handy unit shortcuts
-    # using JLD2
-    # using MAT
-
-    # # should go into OceanTransportMatrixBuilder
-    # using NaNStatistics
-    # using ProgressMeter
-    # using Format
-    # using UnicodePlots
-    # using CairoMakie
-    # using GeoMakie
-
-    # # stdlib
-    # using Statistics
-    # using StatsBase
-    # using LinearAlgebra
-    # using Dates
     using SparseArrays
     using LinearAlgebra
 
@@ -62,31 +39,53 @@
         κVdeep = 1e-5, # m^2/s
     )
 
-	# Check divergence and mass conservation
+    Tsyms = (:T, :Tadv, :TκH, :TκVML, :TκVdeep)
+	for Ttest in (T, Tadv, TκH, TκVML, TκVdeep)
+        @test Ttest isa SparseMatrixCSC{Float64, Int}
+    end
 
+end
+
+@testitem "Timescales (divergence and mass conservation)" setup=[LocalBuild] tags=[:skipci] begin
+
+    using Unitful
+    using Unitful: s, Myr
+    using LinearAlgebra
+
+    # unpack transport matrices
+    (; T, Tadv, TκH, TκVML, TκVdeep, Tsyms) = LocalBuild
     # unpack model grid
-    (; v3D,) = modelgrid
+    (; v3D,) = LocalBuild.modelgrid
     # unpack indices
-    (; wet3D, N) = indices
+    (; wet3D, N) = LocalBuild.indices
+
 	e1 = ones(N)
 	v = v3D[wet3D]
-	Tsyms = (:T, :Tadv, :TκH, :TκVML, :TκVdeep)
-	@info "Timescales (divergence and mass conservation)"
 	for (Ttest, Tsym) in zip((T, Tadv, TκH, TκVML, TκVdeep), Tsyms)
-        @test Ttest isa SparseMatrixCSC{Float64, Int}
 		@info "  $Tsym:"
-		τdiv = ustrip(Myr, norm(e1) / norm(Ttest * e1) * s)
+
+        τdiv = ustrip(Myr, norm(e1) / norm(Ttest * e1) * s)
+        Tsym ∉ (:T, :Tadv) && @test τdiv > 1e6
 		@info "    div: $(round(τdiv, sigdigits=2)) Myr"
+
 		τvol = ustrip(Myr, norm(v) / norm(Ttest' * v) * s)
+        @test τvol > 1e6
 		@info "    vol: $(round(τvol, sigdigits=2)) Myr"
 	end
+end
+
+# @testitem "building matrices" default_imports=false begin
+@testitem "Test if flux divergence (not convergence)" setup=[LocalBuild] tags=[:skipci] begin
+
+    using SparseArrays
+    using LinearAlgebra
+
+    # unpack transport matrices
+    (; T) = LocalBuild
 
     # tests if diagonal elements are > 0 and off-diagonal are < 0.
     diagT = sparse(Diagonal(T))
-
     @test all(diagT.nzval .> 0)
     @test all((T - diagT).nzval .< 0)
-
-
 
 end
