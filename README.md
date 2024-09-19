@@ -13,10 +13,9 @@ The purpose of this package is to build transport matrices from standard CMIP mo
 By rearranging the 3D grid of the ocean into a vector, the divergence of the flow of any tracer can be conveniently expressed in matrix form.
 That is, for the vector $\boldsymbol{x}$ representing the 3D tracer concentrations $\chi$, the divergence of the flow is linear in $\chi$ and can be conveniently represented by $\mathbf{T}\boldsymbol{x}$ as a transport matrix $\mathbf{T}$ acting on $\boldsymbol{x}$.
 
-These matrices are useful in a number of contexts, e.g., for avoiding spin ups, optimization, or novel diagnostics[^1].
+These matrices are useful in a number of contexts, e.g., for avoiding spin ups, optimization, or novel diagnostics[^J20^2^3].
 The motivation for writing this package is to be able to easily compute diagnostics and compare them across CMIP models.
-The original intended application is for validating marine Carbone Dioxide Removal (mCDR) across CMIP models by computing the distribution of times it takes water to reemerge from the deep ocean to the surface.
-This timescale is a key circulation timescale that strongly controls the sequestration efficiency of the ocean.
+The original intended application is for validating marine Carbone Dioxide Removal (mCDR) across CMIP models by computing the distribution of times it water takes to reemerge from the deep ocean to the surface[^4^5].
 
 ## Example use
 
@@ -59,7 +58,7 @@ indices = makeindices(modelgrid.v3D)
 
 That's it! You've got yourself the transport matrix of your dreams!
 
-> [!WARNING]  
+> [!WARNING]
 > This is work in progress, so expect breaking changes in the interface. However, the `test/` directory should contain up-to-date example for building the transport matrix.
 
 ## Acknowledgements
@@ -69,4 +68,8 @@ BP is funded through CSIRO's CarbonLock Future Science Platform.
 
 ## References
 
-[^1]: TODO add references.
+[^J20]: [John et al. (2020)](10.1016/j.chemgeo.2019.119403)
+[^2]: [Pasquier et al. (2023)](10.5194/bg-20-2985-2023)
+[^3]: [Pasquier et al. (2024)](10.5194/bg-21-3373-2024)
+[^4]: [DeVries et al. (2012)](10.1029/2012GL051963)
+[^5]: [Siegel et al. (2021)](10.1088/1748-9326/ac0be0)
