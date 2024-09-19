@@ -7,7 +7,7 @@
 The purpose of this package is to build transport matrices from standard CMIP model output as part of the Transport Matrix Intercomparison Project (TMIP).
 
 By rearranging the 3D grid of the ocean into a vector, the divergence of the flow of any tracer can be conveniently expressed in matrix form.
-That is, for the vector $\boldsymbol{x}$ representing the 3D tracer concentrations $\chi$, the divergence of the flow is linear in $\chi$ and can be conveniently represented by $\mathbf{T}\boldsymbol{x}$ as a transport matrix $\mathbf{T}$ acting on $\boldsymbol{x}$.
+That is, for the vector $\boldsymbol{x}$ representing the 3D tracer concentrations $\chi$, the divergence of the flow is linear in $\chi$ and can be represented by $\mathbf{T}\boldsymbol{x}$ as a transport matrix $\mathbf{T}$ acting on $\boldsymbol{x}$.
 
 These matrices are useful in a number of contexts, e.g., for avoiding spin ups, optimization, or novel diagnostics[^John_et_al_2020][^Pasquier_etal_2023][^Pasquier_etal_2024a][^Pasquier_etal_2024b].
 The motivation for writing this package is to facilitate the use of novel diagnostics across CMIP models.
