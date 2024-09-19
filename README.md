@@ -4,18 +4,14 @@
 
 [![Build Status](https://github.com/TMIP-code/OceanTransportMatrixBuilder.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/TMIP-code/OceanTransportMatrixBuilder.jl/actions/workflows/CI.yml?query=branch%3Amain)
 
-## Purpose
-
 The purpose of this package is to build transport matrices from standard CMIP model output as part of the Transport Matrix Intercomparison Project (TMIP).
-
-## Context
 
 By rearranging the 3D grid of the ocean into a vector, the divergence of the flow of any tracer can be conveniently expressed in matrix form.
 That is, for the vector $\boldsymbol{x}$ representing the 3D tracer concentrations $\chi$, the divergence of the flow is linear in $\chi$ and can be conveniently represented by $\mathbf{T}\boldsymbol{x}$ as a transport matrix $\mathbf{T}$ acting on $\boldsymbol{x}$.
 
-These matrices are useful in a number of contexts, e.g., for avoiding spin ups, optimization, or novel diagnostics[^J20^2^3].
-The motivation for writing this package is to be able to easily compute diagnostics and compare them across CMIP models.
-The original intended application is for validating marine Carbone Dioxide Removal (mCDR) across CMIP models by computing the distribution of times it water takes to reemerge from the deep ocean to the surface[^4^5].
+These matrices are useful in a number of contexts, e.g., for avoiding spin ups, optimization, or novel diagnostics[^John_et_al_2020][^Pasquier_etal_2023][^Pasquier_etal_2024a][^Pasquier_etal_2024b].
+The motivation for writing this package is to facilitate the use of novel diagnostics across CMIP models.
+The original intended application is for validating marine Carbon Dioxide Removal (mCDR) by computing the timescales and pathways for water in the deep ocean to reemerge to the surface[^DeVries_etal_2012][^Siegel_etal_2021].
 
 ## Example use
 
@@ -66,10 +62,9 @@ That's it! You've got yourself the transport matrix of your dreams!
 BP is funded through CSIRO's CarbonLock Future Science Platform.
 
 
-## References
-
-[^J20]: [John et al. (2020)](10.1016/j.chemgeo.2019.119403)
-[^2]: [Pasquier et al. (2023)](10.5194/bg-20-2985-2023)
-[^3]: [Pasquier et al. (2024)](10.5194/bg-21-3373-2024)
-[^4]: [DeVries et al. (2012)](10.1029/2012GL051963)
-[^5]: [Siegel et al. (2021)](10.1088/1748-9326/ac0be0)
+[^John_et_al_2020]: [John et al. (2020)](10.1016/j.chemgeo.2019.119403) AWESOME OCIM: A simple, flexible, and powerful tool for modeling elemental cycling in the oceans.
+[^Pasquier_etal_2023]: [Pasquier et al. (2023)](10.5194/bg-20-2985-2023) Optimal parameters for the ocean's nutrient, carbon, and oxygen cycles compensate for circulation biases but replumb the biological pump.
+[^Pasquier_etal_2024a]: [Pasquier et al. (2024a)](10.5194/bg-21-3373-2024) The biological and preformed carbon pumps in perpetually slower and warmer oceans.
+[^Pasquier_etal_2024b]: [Pasquier et al. (2024b)](10.1029/2024JC021043) Deoxygenation and Its Drivers Analyzed in Steady State for Perpetually Slower and Warmer Oceans.
+[^DeVries_etal_2012]: [DeVries et al. (2012)](10.1029/2012GL051963) The sequestration efficiency of the biological pump.
+[^Siegel_etal_2021]: [Siegel et al. (2021)](10.1088/1748-9326/ac0be0) Assessing the sequestration time scales of some ocean-based carbon dioxide reduction strategies.
