@@ -74,7 +74,6 @@ end
 	end
 end
 
-# @testitem "building matrices" default_imports=false begin
 @testitem "Test if flux divergence (not convergence)" setup=[LocalBuild] tags=[:skipci] begin
 
     using SparseArrays
@@ -87,5 +86,48 @@ end
     diagT = sparse(Diagonal(T))
     @test all(diagT.nzval .> 0)
     @test all((T - diagT).nzval .< 0)
+
+end
+
+@testitem "Ideal age (coarsened)" setup=[LocalBuild] tags=[:skipci] begin
+
+    using SparseArrays
+    using LinearAlgebra
+    using Unitful
+    using Unitful: s, yr
+
+
+    # unpack model grid
+    (; v3D,) = LocalBuild.modelgrid
+    # unpack indices
+    (; wet3D, N) = LocalBuild.indices
+
+    v = v3D[wet3D]
+
+    @info "coarsening grid"
+    LUMP, SPRAY, wet3D_c, v_c = OceanTransportMatrixBuilder.lump_and_spray(wet3D, v; di=2, dj=2, dk=1)
+
+    # unpack transport matrices
+    (; T) = LocalBuild
+
+    # surface mask
+    issrf3D = copy(wet3D)
+    issrf3D[:,:,2:end] .= false
+    issrf = issrf3D[wet3D]
+    # Ideal mean age Γ is governed by
+    # 	∂Γ/∂t + T Γ = 1 - M Γ
+    # where M is matrix mask of surface with short timescale (1s)
+    sΓ = ones(size(v))
+    T_c = LUMP * T * SPRAY
+    issrf_c = LUMP * issrf .> 0
+    M_c = sparse(Diagonal(issrf_c))
+    sΓ_c = LUMP * sΓ
+    @info "Solving ideal mean age"
+    Γ_c = (T_c + M_c) \ sΓ_c
+    Γ = SPRAY * Γ_c
+    Γyr = ustrip.(yr, Γ .* s)
+    Γ3D = OceanTransportMatrixBuilder.as3D(Γyr, wet3D)
+
+    @test 0 < (v' * Γyr) / sum(v) < 2000
 
 end
