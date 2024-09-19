@@ -13,6 +13,9 @@ These matrices are useful in a number of contexts, e.g., for avoiding spin ups, 
 The motivation for writing this package is to facilitate the use of novel diagnostics across CMIP models.
 The original intended application is for validating marine Carbon Dioxide Removal (mCDR) by computing the timescales and pathways for water in the deep ocean to reemerge to the surface[^DeVries_etal_2012][^Siegel_etal_2021].
 
+> [!WARNING]
+> This is work in progress. Breaking changes expected.
+
 ## Example use
 
 The intended use would be simply to feed the ocean transport output from a given CMIP model to the functions in this package to build the desired transport matrix.
@@ -54,8 +57,8 @@ indices = makeindices(modelgrid.v3D)
 
 That's it! You've got yourself the transport matrix of your dreams!
 
-> [!WARNING]
-> This is work in progress, so expect breaking changes in the interface. However, the `test/` directory should contain up-to-date example for building the transport matrix.
+> [!TIP]
+> The `test/` directory should contain up-to-date examples for building the transport matrix and doing some simple calculations.
 
 ## Acknowledgements
 
