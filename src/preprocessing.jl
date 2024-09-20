@@ -143,10 +143,10 @@ function vertexpermutation(lon_vertices, lat_vertices)
     # Find the indices of the common points
     idx_east = findall(in(common_east), points)
     idx_north = findall(in(common_noth), points)
-    idx3 = only(intersect(idx_east, idx_north))
-    idx2 = only(setdiff(idx_east, idx3)) # east_only
-    idx4 = only(setdiff(idx_north, idx3))
-    idx1 = only(setdiff(1:4, idx2, idx3, idx4))
+    idx3 = only(intersect(idx_east, idx_north)) # common to all 3 cells
+    idx2 = only(setdiff(idx_east, idx3)) # common to (i,j) and (i+1,j) only
+    idx4 = only(setdiff(idx_north, idx3)) # common to (i,j) and (i,j+1) only
+    idx1 = only(setdiff(1:4, idx2, idx3, idx4)) # only in (i,j)
     return [idx1, idx2, idx3, idx4]
 
 end
