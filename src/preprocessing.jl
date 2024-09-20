@@ -82,8 +82,12 @@ function makemodelgrid(; areacello_ds, volcello_ds, mlotst_ds)
     mlotst_variable_names = propertynames(mlotst_ds) .|> string
     lon_vertices_var_name = first(sort(filter(x -> occursin("lon", x) && occursin("vert", x), mlotst_variable_names), by=length))
     lat_vertices_var_name = first(sort(filter(x -> occursin("lat", x) && occursin("vert", x), mlotst_variable_names), by=length))
-    lon_vertices = mlotst_ds[lon_vertices_var_name] |> Array # <- typo from xmip (https://github.com/jbusecke/xMIP/issues/369)
-    lat_vertices = mlotst_ds[lat_vertices_var_name] |> Array # <- typo from xmip (https://github.com/jbusecke/xMIP/issues/369)
+    lon_vertices = mlotst_ds[lon_vertices_var_name] |> Array .|> float
+    lat_vertices = mlotst_ds[lat_vertices_var_name] |> Array .|> float
+    # sort the vertices to mathc the default orientation
+    vertexidx = vertexpermutation(lon_vertices, lat_vertices)
+    lon_vertices = lon_vertices[vertexidx,:,:]
+    lat_vertices = lat_vertices[vertexidx,:,:]
 
     C = CartesianIndices(size(lon))
 
@@ -116,7 +120,36 @@ end
 # That is, how do I figure out how the boundaries are connected for other models than ACCESS?
 
 
+# The default orientation is the following:
+#
+#     4 ────┐ 3
+#           │
+#     1 ────┘ 2
+#
+# Given lon_vertices and lat_vertices, find the permutation
+# that sorts the vertices in that order.
+function vertexpermutation(lon_vertices, lat_vertices)
+    # Make sure the vertices are in the right shape (4, nx, ny)
+    @assert size(lon_vertices, 1) == size(lat_vertices, 1) == 4
+    # Take the first grid cell
+    i = j = 1
+    # Turn the vertices into points
+    points = collect(zip(lon_vertices[:, i, j], lat_vertices[:, i, j]))
+    points_east = collect(zip(lon_vertices[:, i+1, j], lat_vertices[:, i+1, j]))
+    points_north = collect(zip(lon_vertices[:, i, j+1], lat_vertices[:, i, j+1]))
+    # Find the common points
+    common_east = intersect(Set(points), Set(points_east))
+    common_noth = intersect(Set(points), Set(points_north))
+    # Find the indices of the common points
+    idx_east = findall(in(common_east), points)
+    idx_north = findall(in(common_noth), points)
+    idx3 = only(intersect(idx_east, idx_north))
+    idx2 = only(setdiff(idx_east, idx3)) # east_only
+    idx4 = only(setdiff(idx_north, idx3))
+    idx1 = only(setdiff(1:4, idx2, idx3, idx4))
+    return [idx1, idx2, idx3, idx4]
 
+end
 
 # View form top for vlon and vlat vertices
 #    4 ────┐ 3
@@ -158,8 +191,15 @@ function centroid2edgedistance(lon, lat, vlon, vlat, i, j, dir)
     C = (lon[i, j], lat[i, j])
     A = vertexpoint(vlon, vlat, i, j, a)
     B = vertexpoint(vlon, vlat, i, j, b)
-    M = (A .+ B) ./ 2
+    M = midpointonsphere(A, B)
     haversine(C, M)
+end
+function midpointonsphere(A, B)
+    if abs(A[1] - B[1]) < 180
+        (A .+ B) ./ 2
+    else # if the edge crosses the longitudinal edge of the map
+        (A .+ B) ./ 2 .+ (180, 0)
+    end
 end
 
 

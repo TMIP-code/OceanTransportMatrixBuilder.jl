@@ -131,3 +131,48 @@ end
     @test 0 < (v' * Γyr) / sum(v) < 2000
 
 end
+
+
+@testitem "grid checks" setup=[LocalBuild] tags=[:skipci] begin
+
+    using GLMakie
+
+    (; lon_vertices, lat_vertices, edge_length_2D, distance_to_edge_2D, lon, lat) = LocalBuild.modelgrid
+
+    colorrange = (0, 1e5)
+    fig = Figure(size=(1200, 500));
+    for (i, dir) in enumerate((:east, :west, :north, :south))
+        ax = Axis(fig[1,i])
+        heatmap!(ax, edge_length_2D[dir]; colorrange)
+        ax = Axis(fig[2,i])
+        heatmap!(ax, distance_to_edge_2D[dir]; colorrange)
+        Label(fig[0,i], text=string(dir), tellwidth=false)
+    end
+    Label(fig[1,0], text="edge_length_2D", tellheight=false, rotation=π/2)
+    Label(fig[2,0], text="distance_to_edge_2D", tellheight=false, rotation=π/2)
+    fig
+    outputfile = "plots/distances_check.png"
+    @info "Saving ideal mean age as image file:\n  $(outputfile)"
+    save(outputfile, fig)
+
+
+
+    fig = Figure()
+    ax = Axis(fig[1,1])
+    aligns = [(:left, :bottom), (:right, :bottom), (:right, :top), (:left, :top)]
+    is = 220 .+ [1, 2, 1]
+    js = 270 .+ [1, 1, 2]
+    itxts = ["i", "i+1", "i"]
+    jtxts = ["j", "j", "j+1"]
+    colors = Makie.wong_colors(3)
+    for (i, j, itxt, jtxt, color, align) in zip(is, js, itxts, jtxts, colors, aligns)
+        scatterlines!(ax, lon_vertices[:,i,j], lat_vertices[:,i,j]; marker=:circle, color)
+        text!(ax, collect(zip(lon_vertices[:,i,j], lat_vertices[:,i,j])); align=align, text=string.(1:4), color)
+        text!(ax, lon[i, j], lat[i, j]; text="($itxt, $jtxt)", color)
+    end
+    fig
+    outputfile = "plots/vertices_check.png"
+    @info "Saving ideal mean age as image file:\n  $(outputfile)"
+    save(outputfile, fig)
+
+end
