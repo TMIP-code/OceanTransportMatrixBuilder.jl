@@ -63,7 +63,8 @@ That's it! You've got yourself the transport matrix of your dreams!
 
 ## Acknowledgements
 
-BP is funded through CSIRO's CarbonLock Future Science Platform.
+This package simply implements published work[^Chamberlain_etal_2019], and the Julia code available here was essentially translated from code by Matt Chamberlain at CSIRO.
+Benoît Pasquier (@briochemc) is funded through CSIRO's CarbonLock Future Science Platform.
 
 
 [^Chamberlain_etal_2019]: [Chamberlain et al. (2019)](10.1016/j.ocemod.2019.01.005) Transport matrices from standard ocean-model output and quantifying circulation response to climate change.
