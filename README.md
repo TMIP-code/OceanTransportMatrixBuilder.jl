@@ -7,7 +7,7 @@
 The purpose of this package is to build transport matrices from standard CMIP model output as part of the Transport Matrix Intercomparison Project (TMIP).
 
 By rearranging the 3D grid of the ocean into a vector, the divergence of the flow of any tracer can be conveniently expressed in matrix form.
-That is, for the vector $\boldsymbol{x}$ representing the 3D tracer concentrations $\chi$, the divergence of the flow is linear in $\chi$ and can be represented by $\mathbf{T}\boldsymbol{x}$ as a transport matrix $\mathbf{T}$ acting on $\boldsymbol{x}$.
+That is, for the vector ***x*** representing the 3D tracer concentrations *x*(***r***) at locations ***r***, the divergence of the flow is linear in *x* and can be represented by **T** ***x*** as a transport matrix **T** acting on ***x***.
 The code of this package is an extension of the work of Matt Chamberlain, who built transport matrices from the ACCESS1.3 model[^Chamberlain_etal_2019], which has been successfully used in multiple following projects[^Holzer_etal_2020][^Pasquier_etal_2023][^Pasquier_etal_2024a][^Pasquier_etal_2024b].
 
 The main application driving this project is for the validation of marine Carbon Dioxide Removal (mCDR) by computing the timescales and pathways for water in the deep ocean to reemerge to the surface[^DeVries_etal_2012][^Siegel_etal_2021].
@@ -27,7 +27,7 @@ using NetCDF
 using YAXArrays
 using OceanTransportMatrixBuilder
 
-inputdir = "/Users/benoitpasquier/Data/TMIP/data/ACCESS-ESM1-5/historical/r1i1p1f1/Jan1990-Dec1999" # <- this is the path on my machine
+inputdir = "/Users/benoitpasquier/Data/TMIP/data/ACCESS-ESM1-5/historical/r1i1p1f1/Jan1990-Dec1999" # <- this is the path on my mac*x*e
 
 # Load umo, vmo, mlotst, volcello, and areacello
 umo_ds = open_dataset(joinpath(inputdir, "umo.nc"))
