@@ -38,22 +38,23 @@ areacello_ds = open_dataset(joinpath(inputdir, "areacello.nc"))
 
 mlotst = mlotst_ds.mlotst |> Array{Float64}
 
-# Make ualldirs
+# Make arrays of the flux on each face for each grid cell
 ϕ = facefluxesfrommasstransport(; umo_ds, vmo_ds)
 
-# Make makemodelgrid
+# Make the required data from grid geometry
 modelgrid = makemodelgrid(; areacello_ds, volcello_ds, mlotst_ds)
 
-# Make indices
+# Make the indices for going back and forth between 3D and 1D
 indices = makeindices(modelgrid.v3D)
 
-# Make transport matrix
-(; T) = transportmatrix(; ϕ, mlotst, modelgrid, indices,
-    ρ = 1025.0, # mean seawater density (kg/m^3)
-    κH = 500.0, # horizontal diffusivity (m^2/s)
-    κVML = 0.1, # mixed-layer vertical diffusivity (m^2/s)
-    κVdeep = 1e-5, # background vertical diffusivity (m^2/s)
-)
+# Some parameter values
+ρ = 1025.0    # density (kg/m^3)
+κH = 500.0    # horizontal diffusivity (m^2/s)
+κVML = 0.1    # mixed-layer vertical diffusivity (m^2/s)
+κVdeep = 1e-5 # background vertical diffusivity (m^2/s)
+
+# Make the transport matrix
+(; T) = transportmatrix(; ϕ, mlotst, modelgrid, indices, ρ, κH, κVML, κVdeep)
 ```
 
 That's it! You've got yourself the transport matrix of your dreams!
