@@ -1,55 +1,124 @@
 
+"""
+    velocity2fluxes(uo, vo; modelgrid, ρ)
 
-function makeualldirections(; umo_ds, vmo_ds)
+Return the fluxes (integrated over cell faces) given veloticies `uo` and `vo`.
+"""
+function velocity2fluxes(; uo, vo, modelgrid, ρ)
 
-    FillValue = umo_ds["umo"].properties["_FillValue"]
+    # Unpack modelgrid
+    (; DZT3d, edge_length_2D) = modelgrid
 
-    umo = umo_ds["umo"] |> Array{Float64}
-    vmo = vmo_ds["vmo"] |> Array{Float64}
+    # Calculate fluxes from velocities
+    umo = @. uo * ρ * DZT3d * edge_length_2D[:east]
+    vmo = @. vo * ρ * DZT3d * edge_length_2D[:north]
+    # TODO check that this orientation is correct for all models?
+    # I think this only applies to Arakawa C-grids...
+
+    return umo, vmo
+end
+
+
+
+"""
+    facefluxesfrommasstransport(; umo_ds, vmo_ds)
+
+Return the fluxes integrated over each cell face (east, west, north, south, top, bottom)
+given mass transport `umo` and `vmo` (fluxes across faces).
+
+See also `facefluxes`.
+"""
+function facefluxesfrommasstransport(; umo_ds, vmo_ds)
+
+    @assert :umo ∈ propertynames(umo_ds) && :vmo ∈ propertynames(vmo_ds)
+
+    umo = umo_ds.umo |> Array{Float64}
+    vmo = vmo_ds.vmo |> Array{Float64}
+
+    FillValue = umo_ds.umo.properties["_FillValue"]
+    @assert isequal(FillValue, vmo_ds.vmo.properties["_FillValue"])
+
+    return facefluxes(umo, vmo; FillValue)
+
+end
+
+"""
+    facefluxesfromvelocities(; uo_ds, vo_ds, modelgrid, ρ)
+
+Return the fluxes integrated over each cell face (east, west, north, south, top, bottom)
+given either `uo_ds`, `vo_ds`, `modelgrid`, and `ρ`.
+
+See also `facefluxes`.
+"""
+function facefluxesfromvelocities(; uo_ds, vo_ds, modelgrid, ρ)
+
+    @assert :uo ∈ propertynames(uo_ds) && :vo ∈ propertynames(vo_ds)
+
+    uo = uo_ds.uo |> Array{Float64}
+    vo = vo_ds.vo |> Array{Float64}
+    umo, vmo = velocity2fluxes(; uo, vo, modelgrid, ρ)
+
+    FillValue = uo_ds.uo.properties["_FillValue"]
+    @assert isequal(FillValue, vo_ds.vo.properties["_FillValue"])
+
+    return facefluxes(umo, vmo; FillValue)
+
+end
+
+"""
+    facefluxes(umo, vmo; FillValue)
+
+Return the fluxes integrated over each cell face (east, west, north, south, top, bottom)
+given the east and north fluxes, `umo` and `vmo`.
+
+The west and south fluxes are computed by simple shift in coordinates.
+The top and bottom fluxes are computed by mass conservation from the seafloor up.
+"""
+function facefluxes(umo, vmo; FillValue)
 
 	iseastborder = isnan.(umo[[2:end;1],:,:]) .& .!isnan.(umo)
 	isnorthborder = isnan.([vmo[:,2:end,:] vmo[end:-1:1,end:end,:]]) .& .!isnan.(vmo)
 	umo[iseastborder] .= 0
 	vmo[isnorthborder] .= 0
 
-	@info "Making ueast and uwest"
-	ueast = replace(umo, NaN=>0.0, FillValue=>0.0) .|> Float64
-	uwest = ueast[[end;1:end-1],:,:] .|> Float64
+	@info "Making ϕeast and ϕwest"
+	ϕeast = replace(umo, NaN=>0.0, FillValue=>0.0) .|> Float64
+	ϕwest = ϕeast[[end;1:end-1],:,:] .|> Float64
 
-	@info "Making vnorth and vsouth"
-	# Check that south pole vnorth is zero (so that it causes no issues with circular shift)
-	vnorth = replace(vmo, NaN=>0.0, FillValue=>0.0) .|> Float64
-	vsouth = vnorth[:,[end;1:end-1],:] .|> Float64
+	@info "Making ϕnorth and ϕsouth"
+	# Check that south pole ϕnorth is zero (so that it causes no issues with circular shift)
+	ϕnorth = replace(vmo, NaN=>0.0, FillValue=>0.0) .|> Float64
+	ϕsouth = ϕnorth[:,[end;1:end-1],:] .|> Float64
 
-	@info "Making wtop and wbottom"
-	# Then build wtop and wbottom from bottom up
+	@info "Making ϕtop and ϕbottom"
+	# Then build ϕtop and ϕbottom from bottom up
 	# Mass conservation implies that
-	# 	uwest + vsouth + wbottom - ueast - vnorth - wtop = 0
+	# 	ϕwest + ϕsouth + ϕbottom - ϕeast - ϕnorth - ϕtop = 0
 	# except at the top.
 	# We could build w from the bottom up, by looking at each
 	# water column's sea floor, but it's simpler to go from the top down,
-	# and then remove wbottom
-	wbottom = similar(ueast)
-	wtop = similar(ueast)
-	for k in reverse(eachindex(axes(ueast, 3)))
-		if k == lastindex(axes(ueast, 3))
-			@views @. wbottom[:,:,k] = 0 # seafloor wbottom is zero
+	# and then remove ϕbottom
+	ϕbottom = similar(ϕeast)
+	ϕtop = similar(ϕeast)
+	for k in reverse(eachindex(axes(ϕeast, 3)))
+		if k == lastindex(axes(ϕeast, 3))
+			@views @. ϕbottom[:,:,k] = 0 # seafloor ϕbottom is zero
 		else
-			@views @. wbottom[:,:,k] = wtop[:,:,k+1] # otherwise it's wtop from below
+			@views @. ϕbottom[:,:,k] = ϕtop[:,:,k+1] # otherwise it's ϕtop from below
 		end
-		@views @. wtop[:,:,k] = wbottom[:,:,k] + uwest[:,:,k] + vsouth[:,:,k] - ueast[:,:,k] - vnorth[:,:,k]
+		@views @. ϕtop[:,:,k] = ϕbottom[:,:,k] + ϕwest[:,:,k] + ϕsouth[:,:,k] - ϕeast[:,:,k] - ϕnorth[:,:,k]
 	end
 
-    ualldirs = (
-        east = ueast,
-        west = uwest,
-        north = vnorth,
-        south = vsouth,
-        top = wtop,
-        bottom = wbottom
+    ϕ = (
+        east = ϕeast,
+        west = ϕwest,
+        north = ϕnorth,
+        south = ϕsouth,
+        top = ϕtop,
+        bottom = ϕbottom
     )
 
-	return ualldirs
+	return ϕ
 end
 
 

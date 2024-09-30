@@ -12,7 +12,8 @@ include("preprocessing.jl")
 include("matrixbuilding.jl")
 include("extratools.jl") # <- I think this should be in a separate "base" repo
 
-export makeualldirections
+export facefluxesfrommasstransport
+export facefluxesfromvelocities
 export makemodelgrid
 export makeindices
 export transportmatrix

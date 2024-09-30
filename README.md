@@ -36,10 +36,10 @@ mlotst_ds = open_dataset(joinpath(inputdir, "mlotst.nc"))
 volcello_ds = open_dataset(joinpath(inputdir, "volcello.nc"))
 areacello_ds = open_dataset(joinpath(inputdir, "areacello.nc"))
 
-mlotst = mlotst_ds["mlotst"] |> Array{Float64}
+mlotst = mlotst_ds.mlotst |> Array{Float64}
 
 # Make ualldirs
-u = makeualldirections(; umo_ds, vmo_ds)
+ϕ = facefluxes(; umo_ds, vmo_ds)
 
 # Make makemodelgrid
 modelgrid = makemodelgrid(; areacello_ds, volcello_ds, mlotst_ds)
@@ -48,7 +48,7 @@ modelgrid = makemodelgrid(; areacello_ds, volcello_ds, mlotst_ds)
 indices = makeindices(modelgrid.v3D)
 
 # Make transport matrix
-(; T) = transportmatrix(; u, mlotst, modelgrid, indices,
+(; T) = transportmatrix(; ϕ, mlotst, modelgrid, indices,
     ρ = 1025.0, # mean seawater density (kg/m^3)
     κH = 500.0, # horizontal diffusivity (m^2/s)
     κVML = 0.1, # mixed-layer vertical diffusivity (m^2/s)

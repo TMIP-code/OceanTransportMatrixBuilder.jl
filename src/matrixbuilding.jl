@@ -1,14 +1,14 @@
 
 """
-    buildTadv(; u, modelgrid, indices, ρ)
+    buildTadv(; ϕ, modelgrid, indices, ρ)
 
 Build the advection operator Tadv.
 """
-function buildTadv(; u, modelgrid, indices, ρ)
+function buildTadv(; ϕ, modelgrid, indices, ρ)
     # default ρ = 1035 kg/m^3 is the value originally used by Chamberlain et al. (2019)
 
 	@info "Building Tadv"
-	𝑖s, 𝑗s, Tvals = upwind_advection_operator_sparse_entries(; u, modelgrid, indices, ρ)
+	𝑖s, 𝑗s, Tvals = upwind_advection_operator_sparse_entries(; ϕ, modelgrid, indices, ρ)
 
     N = indices.N
 
@@ -87,16 +87,16 @@ function buildTκVdeep(; mlotst, modelgrid, indices, κVdeep)
 end
 
 """
-    transportmatrix(; u, mlotst, modelgrid, indices, ρ, κH, κVML, κVdeep, Tadv, TκH, TκVML, TκVdeep)
+    transportmatrix(; ϕ, mlotst, modelgrid, indices, ρ, κH, κVML, κVdeep, Tadv, TκH, TκVML, TκVdeep)
 
 Build the transport matrix, i.e., the flux-divergence operator T = Tadv + TκH + TκVML + TκVdeep,
 and check divergence and mass conservation.
 """
-function transportmatrix(; u, mlotst, modelgrid, indices, ρ,
+function transportmatrix(; ϕ, mlotst, modelgrid, indices, ρ,
 		κH = 500.0, # m^2/s,
 		κVML = 0.1, # m^2/s,
 		κVdeep = 1e-5, # m^2/s,
-		Tadv = buildTadv(; u, modelgrid, indices, ρ),
+		Tadv = buildTadv(; ϕ, modelgrid, indices, ρ),
 		TκH = buildTκH(; modelgrid, indices, ρ, κH),
 		TκVML = buildTκVML(; mlotst, modelgrid, indices, κVML),
 		TκVdeep = buildTκVdeep(; mlotst, modelgrid, indices, κVdeep),
@@ -115,10 +115,7 @@ end
 
 
 # Some personal notes
-# u and v are water mass transports, in kg/s
-# We can convert them to m^3/s using ρ = 1035 kg/m^3
-# but I don't think it matters much since since we normalize
-# by mass (or v3D) to build T.
+# ϕ are water mass transports, in kg/s
 # T[i,j] is the inverse timescale with which upwind j→i occurs such that
 # The tendency of tracer χ at box i due to box j is given
 # 	∂χ[i] = -T[i,j] * χ[j]    units:   1/s * mol/kg (or mol/m^3)
@@ -140,11 +137,11 @@ end
 # For the last one, I make a 3D array filled with the wet linear indices
 
 """
-    upwind_advection_operator_sparse_entries(; u, modelgrid, indices, ρ)
+    upwind_advection_operator_sparse_entries(; ϕ, modelgrid, indices, ρ)
 
 Return the sparse (i, j, v) for the upwind advection operator Tadv.
 """
-function upwind_advection_operator_sparse_entries(; u, modelgrid, indices, ρ)
+function upwind_advection_operator_sparse_entries(; ϕ, modelgrid, indices, ρ)
 
     # Unpack model grid
     (; v3D,) = modelgrid
@@ -161,33 +158,33 @@ function upwind_advection_operator_sparse_entries(; u, modelgrid, indices, ρ)
 		i, j, k = C[Li].I
 		m𝑖 = v3D[i,j,k] * ρ
 		# From West
-		ϕ = u.west[i,j,k]
-		if ϕ > 0
+		ϕwest = ϕ.west[i,j,k]
+		if ϕwest > 0
 			i′ = mod1(i - 1, nx)
 			𝑗 = Lwet3D[i′,j,k]
 			ismissing(𝑗) && @show(i, j, k, i′)
 			m𝑗 = v3D[i′,j,k] * ρ
-			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕ, m𝑖, m𝑗)
+			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕwest, m𝑖, m𝑗)
 		end
 		# From East
-		ϕ = u.east[i,j,k]
-		if ϕ < 0
+		ϕeast = ϕ.east[i,j,k]
+		if ϕeast < 0
 			i′ = mod1(i + 1, nx)
 			𝑗 = Lwet3D[i′,j,k]
 			m𝑗 = v3D[i′,j,k] * ρ
-			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, -ϕ, m𝑖, m𝑗)
+			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, -ϕeast, m𝑖, m𝑗)
 		end
 		# From South
-		ϕ = u.south[i,j,k]
-		if ϕ > 0
+		ϕsouth = ϕ.south[i,j,k]
+		if ϕsouth > 0
 			j′ = j - 1
 			𝑗 = Lwet3D[i,j′,k]
 			m𝑗 = v3D[i,j′,k] * ρ
-			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕ, m𝑖, m𝑗)
+			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕsouth, m𝑖, m𝑗)
 		end
 		# From North (Special case with north bipole)
-		ϕ = u.north[i,j,k]
-		if ϕ < 0
+		ϕnorth = ϕ.north[i,j,k]
+		if ϕnorth < 0
 			if j == ny
 				j′ = j
 				i′ = nx - i + 1
@@ -197,23 +194,23 @@ function upwind_advection_operator_sparse_entries(; u, modelgrid, indices, ρ)
 			end
 			𝑗 = Lwet3D[i′,j′,k]
 			m𝑗 = v3D[i′,j′,k] * ρ
-			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, -ϕ, m𝑖, m𝑗)
+			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, -ϕnorth, m𝑖, m𝑗)
 		end
 		# From Bottom
-		ϕ = u.bottom[i,j,k]
-		if ϕ > 0
+		ϕbottom = ϕ.bottom[i,j,k]
+		if ϕbottom > 0
 			k′ = k + 1
 			𝑗 = Lwet3D[i,j,k′]
 			m𝑗 = v3D[i,j,k′] * ρ
-			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕ, m𝑖, m𝑗)
+			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕbottom, m𝑖, m𝑗)
 		end
 		# From Top
-		ϕ = u.top[i,j,k]
-		if ϕ < 0 && k > 1 # Evaporation/precipitation -> no change to χ
+		ϕtop = ϕ.top[i,j,k]
+		if ϕtop < 0 && k > 1 # Evaporation/precipitation -> no change to χ
 			k′ = k - 1
 			𝑗 = Lwet3D[i,j,k′]
 			m𝑗 = v3D[i,j,k′] * ρ
-			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, -ϕ, m𝑖, m𝑗)
+			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, -ϕtop, m𝑖, m𝑗)
 		end
 	end
 	return 𝑖s, 𝑗s, Tvals

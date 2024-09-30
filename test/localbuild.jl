@@ -1,12 +1,14 @@
 
 
 
-@testmodule BuiltMatrix begin
+@testmodule LocalBuiltMatrix begin
 
     using Test
     using OceanTransportMatrixBuilder
     using NetCDF
     using YAXArrays
+
+    # stdlib
     using SparseArrays
     using LinearAlgebra
 
@@ -16,28 +18,39 @@
     # Load umo, vmo, mlotst, volcello, and areacello
     umo_ds = open_dataset(joinpath(inputdir, "umo.nc"))
     vmo_ds = open_dataset(joinpath(inputdir, "vmo.nc"))
+
+    # TODO revert to uo.nc and vo.nc once I have them
+    uo_ds = open_dataset(joinpath(inputdir, "umo.nc"))
+    vo_ds = open_dataset(joinpath(inputdir, "vmo.nc"))
+
     mlotst_ds = open_dataset(joinpath(inputdir, "mlotst.nc"))
     volcello_ds = open_dataset(joinpath(inputdir, "volcello.nc"))
     areacello_ds = open_dataset(joinpath(inputdir, "areacello.nc"))
 
-    mlotst = mlotst_ds["mlotst"] |> Array{Float64}
+    mlotst = mlotst_ds.mlotst |> Array{Float64}
 
-    # Make ualldirs
-    u = makeualldirections(; umo_ds, vmo_ds)
+    # Some parameter values
+    ρ = 1025.0    # kg/m^3
+    κH = 500.0    # m^2/s
+    κVML = 0.1    # m^2/s
+    κVdeep = 1e-5 # m^2/s
 
     # Make makemodelgrid
     modelgrid = makemodelgrid(; areacello_ds, volcello_ds, mlotst_ds)
+
+    # Make ualldirs
+    ϕ = facefluxesfrommasstransport(; umo_ds, vmo_ds)
+    # ϕ_bis = facefluxesfromvelocities(; uo_ds, vo_ds, modelgrid, ρ)
+
+    # for dir in (:east, :west, :north, :south, :top, :bottom)
+    #     @test_broken isapprox(getpropery(ϕ, dir), getpropery(ϕ_bis, dir), rtol = 0.1)
+    # end
 
     # Make indices
     indices = makeindices(modelgrid.v3D)
 
     # Make transport matrix
-    (; T, Tadv, TκH, TκVML, TκVdeep) = transportmatrix(; u, mlotst, modelgrid, indices,
-        ρ = 1025.0,
-        κH = 500.0, # m^2/s
-        κVML = 0.1, # m^2/s
-        κVdeep = 1e-5, # m^2/s
-    )
+    (; T, Tadv, TκH, TκVML, TκVdeep) = transportmatrix(; ϕ, mlotst, modelgrid, indices, ρ, κH, κVML, κVdeep)
 
     Tsyms = (:T, :Tadv, :TκH, :TκVML, :TκVdeep)
 	for Ttest in (T, Tadv, TκH, TκVML, TκVdeep)
@@ -79,24 +92,24 @@ end
         # Make indices
         indicess[model] = makeindices(modelgrids[model].v3D)
 
-        mlotsts[model] = mlotst_ds["mlotst"] |> Array{Float64}
+        mlotsts[model] = mlotst_ds.mlotst |> Array{Float64}
 
     end
 
 end
 
-@testitem "Timescales (divergence and mass conservation)" setup=[BuiltMatrix] tags=[:skipci] begin
+@testitem "Timescales (divergence and mass conservation)" setup=[LocalBuiltMatrix] tags=[:skipci] begin
 
     using Unitful
     using Unitful: s, Myr
     using LinearAlgebra
 
     # unpack transport matrices
-    (; T, Tadv, TκH, TκVML, TκVdeep, Tsyms) = BuiltMatrix
+    (; T, Tadv, TκH, TκVML, TκVdeep, Tsyms) = LocalBuiltMatrix
     # unpack model grid
-    (; v3D,) = BuiltMatrix.modelgrid
+    (; v3D,) = LocalBuiltMatrix.modelgrid
     # unpack indices
-    (; wet3D, N) = BuiltMatrix.indices
+    (; wet3D, N) = LocalBuiltMatrix.indices
 
 	e1 = ones(N)
 	v = v3D[wet3D]
@@ -113,13 +126,13 @@ end
 	end
 end
 
-@testitem "Test if flux divergence (not convergence)" setup=[BuiltMatrix] tags=[:skipci] begin
+@testitem "Test if flux divergence (not convergence)" setup=[LocalBuiltMatrix] tags=[:skipci] begin
 
     using SparseArrays
     using LinearAlgebra
 
     # unpack transport matrices
-    (; T) = BuiltMatrix
+    (; T) = LocalBuiltMatrix
 
     # tests if diagonal elements are > 0 and off-diagonal are < 0.
     diagT = sparse(Diagonal(T))
@@ -128,7 +141,7 @@ end
 
 end
 
-@testitem "Ideal age (coarsened)" setup=[BuiltMatrix] tags=[:skipci] begin
+@testitem "Ideal age (coarsened)" setup=[LocalBuiltMatrix] tags=[:skipci] begin
 
     using SparseArrays
     using LinearAlgebra
@@ -137,9 +150,9 @@ end
 
 
     # unpack model grid
-    (; v3D,) = BuiltMatrix.modelgrid
+    (; v3D,) = LocalBuiltMatrix.modelgrid
     # unpack indices
-    (; wet3D, N) = BuiltMatrix.indices
+    (; wet3D, N) = LocalBuiltMatrix.indices
 
     v = v3D[wet3D]
 
@@ -147,7 +160,7 @@ end
     LUMP, SPRAY, wet3D_c, v_c = OceanTransportMatrixBuilder.lump_and_spray(wet3D, v; di=2, dj=2, dk=1)
 
     # unpack transport matrices
-    (; T) = BuiltMatrix
+    (; T) = LocalBuiltMatrix
 
     # surface mask
     issrf3D = copy(wet3D)
