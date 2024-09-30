@@ -39,7 +39,7 @@ areacello_ds = open_dataset(joinpath(inputdir, "areacello.nc"))
 mlotst = mlotst_ds.mlotst |> Array{Float64}
 
 # Make ualldirs
-ϕ = facefluxes(; umo_ds, vmo_ds)
+ϕ = facefluxesfrommasstransport(; umo_ds, vmo_ds)
 
 # Make makemodelgrid
 modelgrid = makemodelgrid(; areacello_ds, volcello_ds, mlotst_ds)
@@ -59,7 +59,7 @@ indices = makeindices(modelgrid.v3D)
 That's it! You've got yourself the transport matrix of your dreams!
 
 > [!TIP]
-> The `test/` directory should contain up-to-date examples for building the transport matrix and doing some simple calculations.
+> The `test/` directory contains up-to-date examples for building the transport matrix and doing some simple calculations.
 
 ## Acknowledgements
 
