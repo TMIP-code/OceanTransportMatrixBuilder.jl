@@ -4,6 +4,9 @@
 
 [![Build Status](https://github.com/TMIP-code/OceanTransportMatrixBuilder.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/TMIP-code/OceanTransportMatrixBuilder.jl/actions/workflows/CI.yml?query=branch%3Amain)
 
+> [!WARNING]
+> This is work in progress. Breaking changes expected.
+
 The purpose of this package is to build transport matrices from standard CMIP model output as part of the Transport Matrix Intercomparison Project (TMIP).
 
 By rearranging the 3D grid of the ocean into a vector, the divergence of the flow of any tracer can be conveniently expressed in matrix form.
@@ -13,9 +16,6 @@ The code of this package is an extension of the work of Matt Chamberlain, who bu
 The main application driving this project is for the validation of marine Carbon Dioxide Removal (mCDR) by computing the timescales and pathways for water in the deep ocean to reemerge to the surface[^DeVries_etal_2012][^Siegel_etal_2021].
 However, these matrices are useful in a number of contexts, e.g., for avoiding spin ups, optimization, or novel diagnostics[^John_et_al_2020].
 The motivation for sharing this package is thus to facilitate the use of novel diagnostics across CMIP models.
-
-> [!WARNING]
-> This is work in progress. Breaking changes expected.
 
 ## Example use
 
@@ -58,6 +58,19 @@ indices = makeindices(modelgrid.v3D)
 ```
 
 That's it! You've got yourself the transport matrix of your dreams!
+
+> [!WARNING]
+> This does not work for all CMIP models! See below for a list that passed the rudimentary tests.
+
+
+
+## List of models tested
+
+```
+ACCESS1-3
+ACCESS-ESM1-5
+ACCESS-CM2
+```
 
 > [!TIP]
 > The `test/` directory contains up-to-date examples for building the transport matrix and doing some simple calculations.
