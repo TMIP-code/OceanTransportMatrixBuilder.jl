@@ -8,14 +8,14 @@
             "orcid": "0000-0002-3838-5976",
             "affiliation": "Contract Researcher for CSIRO, Adjunct Fellow at the School of Mathematics and Statistics, UNSW",
             "name": "Benoît Pasquier"
-        },
+        }
     ],
     "keywords": [
         "julia",
         "transport-matrix",
         "transport-matrices",
         "transport",
-        "matrix"
+        "matrix",
         "optimization",
         "optimisation",
         "model",
