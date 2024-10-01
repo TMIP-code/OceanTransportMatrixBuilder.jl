@@ -6,8 +6,15 @@
     "creators": [
         {
             "orcid": "0000-0002-3838-5976",
-            "affiliation": "Contract Researcher for CSIRO, Adjunct Fellow at the School of Mathematics and Statistics, UNSW",
+            "affiliation": "Contract Researcher for CSIRO; Adjunct Fellow at the School of Mathematics and Statistics, UNSW, Sydney, AU",
             "name": "Benoît Pasquier"
+        }
+    ],
+    "contributors":[
+        {
+            "orcid": "0000-0002-3287-3282",
+            "affiliation": "CSIRO, Hobart, AU",
+            "name": "Matthew A. Chamberlain"
         }
     ],
     "keywords": [

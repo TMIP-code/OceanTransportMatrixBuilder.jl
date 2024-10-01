@@ -89,7 +89,7 @@ This can be to this code directly,
 > Benoît Pasquier (2024) “OceanTransportMatrixBuilder.jl: A Julia package to build ocean transport matrices from CMIP model output”. Zenodo. doi: 10.5281/zenodo.13864524.
 
 or to the paper (currently in preparation) that describes it, or (ideally) both.
-You can also find the citations in BibteX format in the `CITATION.bib` file.
+You can also find the citations in BibTeX format in the `CITATION.bib` file.
 
 
 ## Acknowledgements
