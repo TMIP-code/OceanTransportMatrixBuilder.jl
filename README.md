@@ -86,9 +86,10 @@ This code is © Benoît Pasquier (2024), and it is made available under the MIT 
 Over and above the legal restrictions imposed by this license, if you use this software for an academic publication then you are obliged to provide proper attribution.
 This can be to this code directly,
 
-> B. Pasquier. OceanTransportMatrixBuilder.jl: A Julia package to build ocean transport matrices from CMIP model output (2024). TMIP-code/OceanTransportMatrixBuilder.jl.
+> Benoît Pasquier (2024) “OceanTransportMatrixBuilder.jl: A Julia package to build ocean transport matrices from CMIP model output”. Zenodo. doi: 10.5281/zenodo.13864524.
 
 or to the paper (currently in preparation) that describes it, or (ideally) both.
+You can also find the citations in BibteX format in the `CITATION.bib` file.
 
 
 ## Acknowledgements
