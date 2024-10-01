@@ -3,6 +3,8 @@
 *A Julia package to build ocean transport matrices from CMIP model output.*
 
 [![Build Status](https://github.com/TMIP-code/OceanTransportMatrixBuilder.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/TMIP-code/OceanTransportMatrixBuilder.jl/actions/workflows/CI.yml?query=branch%3Amain)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.13864392.svg)](https://doi.org/10.5281/zenodo.13864392)
+
 
 > [!WARNING]
 > This is work in progress. Breaking changes expected.
