@@ -75,10 +75,25 @@ ACCESS-CM2
 > [!TIP]
 > The `test/` directory contains up-to-date examples for building the transport matrix and doing some simple calculations.
 
+## Citation
+
+
+
+This code is © Benoît Pasquier (2024), and it is made available under the MIT license enclosed with the software.
+
+Over and above the legal restrictions imposed by this license, if you use this software for an academic publication then you are obliged to provide proper attribution.
+This can be to this code directly,
+
+> B. Pasquier. OceanTransportMatrixBuilder.jl: A Julia package to build ocean transport matrices from CMIP model output (2024). TMIP-code/OceanTransportMatrixBuilder.jl.
+
+or to the paper (currently in preparation) that describes it, or (ideally) both.
+
+
 ## Acknowledgements
 
 This package simply implements published work[^Chamberlain_etal_2019], and the Julia code available here was essentially translated from code by Matt Chamberlain at CSIRO.
 Benoît Pasquier (@briochemc) is funded through CSIRO's CarbonLock Future Science Platform.
+
 
 
 [^Chamberlain_etal_2019]: [Chamberlain et al. (2019)](10.1016/j.ocemod.2019.01.005) Transport matrices from standard ocean-model output and quantifying circulation response to climate change.
