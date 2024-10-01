@@ -95,7 +95,7 @@ You can also find the citations in BibTeX format in the `CITATION.bib` file.
 ## Acknowledgements
 
 This package simply implements published work[^Chamberlain_etal_2019], and the Julia code available here was essentially translated from code by Matt Chamberlain at CSIRO.
-Benoît Pasquier (@briochemc) is funded through CSIRO's CarbonLock Future Science Platform.
+Benoît Pasquier (@briochemc) is funded through CSIRO's CarbonLock Future Science Platform, supervised by Richard Matear at CSIRO.
 
 
 
