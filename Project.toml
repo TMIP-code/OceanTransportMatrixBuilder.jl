@@ -1,18 +1,16 @@
 name = "OceanTransportMatrixBuilder"
 uuid = "c2b4a04e-6049-4fc4-aa6a-5508a29a1e1c"
 authors = ["Benoit Pasquier <briochemc@gmail.com> and contributors"]
-version = "0.1.8"
+version = "0.1.9"
 
 [deps]
 Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
 Distances = "0.10"
 LinearAlgebra = "1"
-ProgressMeter = "1"
 SparseArrays = "1"
 julia = "1.10"
 
@@ -21,6 +19,7 @@ CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 NetCDF = "30363a11-5582-574a-97bb-aa9a979735b9"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TestItemRunner = "f8b46487-2199-4994-9208-9a1283c18c0a"
@@ -30,4 +29,4 @@ YAXArrays = "c21b50f5-aa40-41ea-b809-c0f5e47bfa5c"
 Zarr = "0a941bbe-ad1d-11e8-39d9-ab76183a1d99"
 
 [targets]
-test = ["GLMakie", "LinearAlgebra", "NetCDF", "Test", "TestItemRunner", "TestItems", "Unitful", "YAXArrays", "CSV", "DataFrames", "Zarr"]
+test = ["GLMakie", "LinearAlgebra", "Makie", "NetCDF", "Test", "TestItemRunner", "TestItems", "Unitful", "YAXArrays", "CSV", "DataFrames", "Zarr"]

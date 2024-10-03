@@ -104,7 +104,7 @@ function transportmatrix(; ϕ, mlotst, modelgrid, indices, ρ,
 
 	@info "Building T"
 
-	T = Tadv + TκH + TκVML + TκVdeep
+	@time T = Tadv + TκH + TκVML + TκVdeep
 
 	return (; T, Tadv, TκH, TκVML, TκVdeep)
 end
@@ -153,7 +153,7 @@ function upwind_advection_operator_sparse_entries(; ϕ, modelgrid, indices, ρ)
 	nxyz = size(wet3D)
     nx, ny, _ = nxyz
 
-    @showprogress for 𝑖 in eachindex(Lwet)
+    @time for 𝑖 in eachindex(Lwet)
 		Li = Lwet[𝑖]
 		i, j, k = C[Li].I
 		m𝑖 = v3D[i,j,k] * ρ
@@ -282,7 +282,7 @@ function horizontal_diffusion_operator_sparse_entries(; modelgrid, indices, κH,
 	nxyz = size(wet3D)
     nx, ny, _ = nxyz
 
-    @showprogress for 𝑖 in eachindex(Lwet)
+    @time for 𝑖 in eachindex(Lwet)
         ΩH[𝑖] || continue # only continue if inside ΩH
 		Li = Lwet[𝑖]
 		i, j, k = C[Li].I
@@ -384,7 +384,7 @@ function vertical_diffusion_operator_sparse_entries(; modelgrid, indices, κV, �
 	nxyz = size(wet3D)
     _, _, nz = nxyz
 
-    @showprogress for 𝑖 in eachindex(Lwet)
+    @time for 𝑖 in eachindex(Lwet)
         Ω[𝑖] || continue # only continue if inside Ω
 		Li = Lwet[𝑖]
 		i, j, k = C[Li].I

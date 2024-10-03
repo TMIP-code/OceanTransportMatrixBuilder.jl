@@ -5,7 +5,6 @@ using SparseArrays
 using LinearAlgebra
 
 # deps
-using ProgressMeter: @showprogress
 using Distances: haversine
 
 include("preprocessing.jl")

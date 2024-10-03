@@ -18,14 +18,23 @@
     # Load umo, vmo, mlotst, volcello, and areacello
     umo_ds = open_dataset(joinpath(inputdir, "umo.nc"))
     vmo_ds = open_dataset(joinpath(inputdir, "vmo.nc"))
-
-    # TODO revert to uo.nc and vo.nc once I have them
-    uo_ds = open_dataset(joinpath(inputdir, "umo.nc"))
-    vo_ds = open_dataset(joinpath(inputdir, "vmo.nc"))
+    uo_ds = open_dataset(joinpath(inputdir, "uo.nc"))
+    vo_ds = open_dataset(joinpath(inputdir, "vo.nc"))
 
     mlotst_ds = open_dataset(joinpath(inputdir, "mlotst.nc"))
     volcello_ds = open_dataset(joinpath(inputdir, "volcello.nc"))
     areacello_ds = open_dataset(joinpath(inputdir, "areacello.nc"))
+
+    using GLMakie
+    fig = Figure()
+    ax = Axis(fig[1,1], xlabel = "lon", ylabel = "lat")
+    lines!(ax, mlotst_ds.lon_verticies[:,1,1] |> Vector, mlotst_ds.lat_verticies[:,1,1] |> Vector)
+    text!(ax, areacello_ds.lon[1], areacello_ds.lat[1]; text="area (i,j)", align = (:center, :bottom))
+    text!(ax, umo_ds.lon[1], umo_ds.lat[1]; text="umo (i,j)", align = (:left, :center))
+    text!(ax, uo_ds.lon[1], uo_ds.lat[1]; text="uo (i,j)", align = (:left, :center))
+    text!(ax, vmo_ds.lon[1], vmo_ds.lat[1]; text="vmo (i,j)", align = (:center, :bottom))
+    text!(ax, vo_ds.lon[1], vo_ds.lat[1]; text="vo (i,j)", align = (:center, :bottom))
+    fig
 
     mlotst = mlotst_ds.mlotst |> Array{Float64}
 
@@ -40,14 +49,15 @@
 
     # Make ualldirs
     ϕ = facefluxesfrommasstransport(; umo_ds, vmo_ds)
-    # ϕ_bis = facefluxesfromvelocities(; uo_ds, vo_ds, modelgrid, ρ)
-
-    # for dir in (:east, :west, :north, :south, :top, :bottom)
-    #     @test_broken isapprox(getpropery(ϕ, dir), getpropery(ϕ_bis, dir), rtol = 0.1)
-    # end
+    ϕ_bis = facefluxesfromvelocities(; uo_ds, vo_ds, modelgrid, ρ)
 
     # Make indices
     indices = makeindices(modelgrid.v3D)
+
+    fig = Figure()
+    ax = Axis(fig[1,1], xlabel = "i", ylabel = "j")
+    hm = heatmap!(ax, indices.wet3D[:,:,1])
+    fig
 
     # Make transport matrix
     (; T, Tadv, TκH, TκVML, TκVdeep) = transportmatrix(; ϕ, mlotst, modelgrid, indices, ρ, κH, κVML, κVdeep)
@@ -184,6 +194,117 @@ end
 
 end
 
+@testitem "mass transport vs velocity checks" setup=[LocalBuiltMatrix] tags=[:skipci] begin
+
+    using GLMakie
+    using Makie.StructArrays
+
+    (; ϕ, ϕ_bis) = LocalBuiltMatrix
+    (; wet3D) = LocalBuiltMatrix.indices
+
+    kgs⁻¹ = rich("kg s", superscript("−1"))
+    fig = Figure(size = (1000, 600))
+    uvw = [:u, :v, :w]
+    dirs = [:east :north :top; :west :south :bottom]
+    colormap = to_colormap(:BuPu_9)
+    colormap[1] = RGBAf(1, 1, 1, 1)
+    for idx in eachindex(IndexCartesian(), dirs)
+        i, j = Tuple(idx)
+        dir = dirs[idx]
+        xlabel = rich("mass transport ϕ (", kgs⁻¹, ")")
+        ylabel = rich("velocity ϕ (", kgs⁻¹, ")")
+        ax = Axis(fig[i,j]; xlabel, ylabel, aspect = 1)
+        imax = size(dirs, 1)
+        hidexdecorations!(ax, label = i < imax, ticklabels = i < imax, ticks = i < imax, grid = false)
+        hideydecorations!(ax, label = j > 1, ticklabels = false, ticks = false, grid = false)
+        X = getproperty(ϕ, dir)[wet3D]
+        Y = getproperty(ϕ_bis, dir)[wet3D]
+        XYmax = extrema([X; Y])
+        scatter!(ax, X, Y, markersize = 0.5)
+        # points = Point2f.(X, Y)
+        # plt = datashader!(ax, points; local_operation = x -> log10(x + 1), colormap)
+        # translate!(plt, 0, 0, -100) # move the plot behind the grid
+        xlims!(ax, XYmax)
+        ylims!(ax, XYmax)
+        text!(ax, 0, 1, text = string(dir), align = (:left, :top), offset = (5, -5), space = :relative)
+        # (i == imax) && linkaxes!(contents(fig[1:imax,j])...)
+    end
+    # Labels
+    for j in axes(dirs, 2)
+        text = "$(uvw[j])o vs $(uvw[j])mo"
+        Label(fig[0,j]; text, tellwidth = false)
+    end
+    Label(fig[-1,:], text = "Cell area fluxes from mass transport vs velocities", tellwidth = false, fontsize = 20)
+    fig
+    outputfile = "plots/cell_face_fluxes_check_local_ACCESS-ESM1-5.png"
+    @info "Saving cell face fluxes check as image file:\n $(joinpath("test", outputfile))"
+    save(outputfile, fig)
+
+    for dir in dirs
+        @test_broken isapprox(tovec(ϕ, dir), tovec(ϕ_bis, dir), rtol = 0.1)
+    end
+
+    # Difference between the fluxes from velocities and mass transport
+    (; uo_ds, vo_ds, umo_ds, vmo_ds, modelgrid, ρ) = LocalBuiltMatrix
+    uo = uo_ds.uo |> Array{Float64}
+    vo = vo_ds.vo |> Array{Float64}
+    umo = umo_ds.umo |> Array{Float64}
+    vmo = vmo_ds.vmo |> Array{Float64}
+    umo_bis, vmo_bis = OceanTransportMatrixBuilder.velocity2fluxes(; uo, vo, modelgrid, ρ)
+    colorrange = 1e9 .* (-1, 1)
+    colormap = cgrad(:RdBu, rev=true)
+    Δcolorrange = (-100, 100)
+    Δcolormap = cgrad(:PRGn, rev=true)
+    # for k in axes(umo, 3)
+    for k in [1]
+        local fig = Figure(size=(1200, 500))
+
+        local ax = Axis(fig[1,1], xlabel = "i", ylabel = "j")
+        heatmap!(ax, umo_bis[:,:,k]; colormap, colorrange)
+        text!(ax, 0, 1; text = "umo_bis", align = (:left, :top), offset = (5, -5), space = :relative)
+        hidedecorations!(ax)
+
+        ax = Axis(fig[2,1], xlabel = "i", ylabel = "j")
+        heatmap!(ax, vmo_bis[:,:,k]; colormap, colorrange)
+        text!(ax, 0, 1; text = "vmo_bis", align = (:left, :top), offset = (5, -5), space = :relative)
+        hidedecorations!(ax)
+
+        ax = Axis(fig[1,2], xlabel = "i", ylabel = "j")
+        heatmap!(ax, umo[:,:,k]; colormap, colorrange)
+        text!(ax, 0, 1; text = "umo", align = (:left, :top), offset = (5, -5), space = :relative)
+        hidedecorations!(ax)
+
+        ax = Axis(fig[2,2], xlabel = "i", ylabel = "j")
+        hm = heatmap!(ax, vmo[:,:,k]; colormap, colorrange)
+        text!(ax, 0, 1; text = "vmo", align = (:left, :top), offset = (5, -5), space = :relative)
+        hidedecorations!(ax)
+
+        ax = Axis(fig[1,3], xlabel = "i", ylabel = "j")
+        heatmap!(ax, 100((umo_bis - umo) ./ umo)[:,:,k]; colormap = Δcolormap, colorrange = Δcolorrange)
+        text!(ax, 0, 1; text = "(umo_bis − umo) / umo", align = (:left, :top), offset = (5, -5), space = :relative)
+        hidedecorations!(ax)
+
+        ax = Axis(fig[2,3], xlabel = "i", ylabel = "j")
+        Δhm = heatmap!(ax, 100((vmo_bis - vmo) ./ vmo)[:,:,k]; colormap = Δcolormap, colorrange = Δcolorrange)
+        text!(ax, 0, 1; text = "(vmo_bis − vmo) / vmo", align = (:left, :top), offset = (5, -5), space = :relative)
+        hidedecorations!(ax)
+
+        cb = Colorbar(fig[3,1:2], hm; label = "kg s⁻¹", vertical = false, flipaxis = false)
+        cb.width = Relative(0.666)
+
+        Δcb = Colorbar(fig[3,3], Δhm; label = "%", vertical = false, flipaxis = false)
+        Δcb.width = Relative(1)
+
+        Label(fig[0,:], text = "ϕ_bis - ϕ (k=$k)", tellwidth = false, fontsize = 20)
+        outputdir = "plots/fluxes_from_velocity"
+        mkpath(outputdir)
+        local outputfile = joinpath(outputdir, "k=$(k)_check_local_ACCESS-ESM1-5.png")
+        @info "Saving fluxes comparison k=$k check as image file:\n $(joinpath("test", outputfile))"
+        save(outputfile, fig)
+    end
+
+end
+
 
 @testitem "grid checks" setup=[BuiltACCESSModelGrids] tags=[:skipci] begin
 
@@ -251,11 +372,11 @@ end
             heatmap!(ax, ustrip.(km, distance_to_edge_2D[dir] * m); colorrange)
             customdecorations!(ax; i, j, imax = 2)
 
-            Label(fig[0,j], text=string(dir), tellwidth=false)
+            Label(fig[0,j], text = string(dir), tellwidth=false)
         end
-        Label(fig[1,0], text="edge_length_2D", tellheight=false, rotation=π/2)
-        Label(fig[2,0], text="distance_to_edge_2D", tellheight=false, rotation=π/2)
-        Label(fig[-1,1:4], text="Distances check $model model", tellwidth=false, fontsize=20)
+        Label(fig[1,0], text = "edge_length_2D", tellheight=false, rotation=π/2)
+        Label(fig[2,0], text = "distance_to_edge_2D", tellheight=false, rotation=π/2)
+        Label(fig[-1,1:4], text = "Distances check $model model", tellwidth=false, fontsize=20)
         cb = Colorbar(fig[1:2,5]; limits=colorrange, label="km")
         cb.height = Relative(0.8)
         fig
@@ -275,10 +396,10 @@ end
         colors = Makie.wong_colors(3)
         for (i, j, itxt, jtxt, color, align) in zip(is, js, itxts, jtxts, colors, aligns)
             scatterlines!(ax, lon_vertices[:,i,j], lat_vertices[:,i,j]; marker=:circle, color)
-            text!(ax, collect(zip(lon_vertices[:,i,j], lat_vertices[:,i,j])); align=align, text=string.(1:4), color)
-            text!(ax, lon[i, j], lat[i, j]; text="($itxt, $jtxt)", color)
+            text!(ax, collect(zip(lon_vertices[:,i,j], lat_vertices[:,i,j])); align = align, text = string.(1:4), color)
+            text!(ax, lon[i, j], lat[i, j]; text = "($itxt, $jtxt)", color)
         end
-        Label(fig[0,1], text="Vertices check $model model", tellwidth = false, fontsize = 20)
+        Label(fig[0,1], text = "Vertices check $model model", tellwidth = false, fontsize = 20)
         fig
         outputfile = "plots/vertices_check_local_$model.png"
         @info "Saving vertices check as image file:\n  $(outputfile)"
@@ -310,7 +431,7 @@ end
         lateastwest = reduce(vcat, [[row; NaN] for row in eachrow(lat)])
         lines!(ax, loneastwest, lateastwest, linewidth = 0.5)
 
-        Label(fig[0,1], text="Longitude/latitude grid check $model model", tellwidth = false, fontsize = 20)
+        Label(fig[0,1], text = "Longitude/latitude grid check $model model", tellwidth = false, fontsize = 20)
         fig
         outputfile = "plots/lonlat_check_local_$model.png"
         @info "Saving lon/lat check as image file:\n  $(outputfile)"
@@ -323,7 +444,7 @@ end
         ax = Axis(fig[1,1], xlabel = "i", ylabel = "j")
         cf = contourf!(ax, ustrip.(km^2, area2D * m^2))
         cb = Colorbar(fig[1,2], cf; label = km2)
-        Label(fig[0,1], text="Area grid check $model model", tellwidth = false, fontsize = 20)
+        Label(fig[0,1], text = "Area grid check $model model", tellwidth = false, fontsize = 20)
         fig
         outputfile = "plots/area_check_local_$model.png"
         @info "Saving area check as image file:\n  $(outputfile)"
@@ -347,7 +468,7 @@ end
         end
         cb = Colorbar(fig[1:3,end+1], hm; label = km3)
         cb.height = Relative(0.666)
-        Label(fig[0,1:2], text="Volume grid check $model model", tellwidth = false, fontsize = 20)
+        Label(fig[0,1:2], text = "Volume grid check $model model", tellwidth = false, fontsize = 20)
         fig
         outputfile = "plots/volume_check_local_$model.png"
         @info "Saving volume check as image file:\n  $(outputfile)"
@@ -370,7 +491,7 @@ end
         end
         cb = Colorbar(fig[1:3,end+1], hm; label = "m")
         cb.height = Relative(0.666)
-        Label(fig[0,1:2], text="Cell thickness grid check $model model", tellwidth = false, fontsize = 20)
+        Label(fig[0,1:2], text = "Cell thickness grid check $model model", tellwidth = false, fontsize = 20)
         fig
         outputfile = "plots/cell_thickness_check_local_$model.png"
         @info "Saving cell thickness check as image file:\n  $(outputfile)"
@@ -403,7 +524,7 @@ end
         hm = heatmap!(ax, BuiltACCESSModelGrids.mlotsts[model]; colorrange, colorscale)
         cb = Colorbar(fig[1,end+1], hm; label = "MLD (m)", ticks=[50, 100, 200, 500, 1000, 2000, 5000])
         cb.height = Relative(0.666)
-        Label(fig[0,1], text="$model mixed-layer depth", tellwidth = false, fontsize = 20)
+        Label(fig[0,1], text = "$model mixed-layer depth", tellwidth = false, fontsize = 20)
         fig
         outputfile = "plots/MLD_check_local_$model.png"
         @info "Saving MLD check as image file:\n  $(outputfile)"
