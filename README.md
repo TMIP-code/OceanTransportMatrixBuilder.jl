@@ -29,7 +29,8 @@ using NetCDF
 using YAXArrays
 using OceanTransportMatrixBuilder
 
-inputdir = "/Users/benoitpasquier/Data/TMIP/data/ACCESS-ESM1-5/historical/r1i1p1f1/Jan1990-Dec1999" # <- this is the path on my mac*x*e
+inputdir = "/Users/benoitpasquier/Data/TMIP/data/ACCESS-ESM1-5/historical/r1i1p1f1/Jan1990-Dec1999"
+# The path above is for my local machine. See test/onlinebuild.jl for an example using data from the cloud.
 
 # Load datasets
 umo_ds = open_dataset(joinpath(inputdir, "umo.nc"))
@@ -38,7 +39,8 @@ mlotst_ds = open_dataset(joinpath(inputdir, "mlotst.nc"))
 volcello_ds = open_dataset(joinpath(inputdir, "volcello.nc"))
 areacello_ds = open_dataset(joinpath(inputdir, "areacello.nc"))
 
-# These are the variables required
+# Load the required variables
+# Note: mass transport is expected to live on the (u,v) coordinates of an Arakawa C-grid
 umo = umo_ds.umo # mass transport across "east" cell face
 vmo = vmo_ds.vmo # mass transport across "north" cell face
 mlotst = mlotst_ds.mlotst # MLD
@@ -49,7 +51,8 @@ lat = volcello_ds.lat # latitude of cell centers
 lev = volcello_ds.lev # depth of cell centers
 lon_vertices = volcello_ds.lon_verticies # cell vertices
 lat_vertices = volcello_ds.lat_verticies # cell vertices
-# vertices name is from xmip bug: https://github.com/jbusecke/xMIP/issues/369
+# "verticies" name is an xmip bug: https://github.com/jbusecke/xMIP/issues/369
+# (my local data was preprocessed with xmip)
 
 # Make arrays of the flux on each face for each grid cell
 ϕ = facefluxesfrommasstransport(; umo, vmo)
@@ -66,14 +69,14 @@ indices = makeindices(modelgrid.v3D)
 κVML = 0.1    # mixed-layer vertical diffusivity (m^2/s)
 κVdeep = 1e-5 # background vertical diffusivity (m^2/s)
 
-# Make the transport matrix
+# Make the transport matrix (should take a few seconds)
 (; T) = transportmatrix(; ϕ, mlotst, modelgrid, indices, ρ, κH, κVML, κVdeep)
 ```
 
 That's it! You've got yourself the transport matrix of your dreams!
 
 > [!WARNING]
-> This does not work for all CMIP models! See below for a list that passed the rudimentary tests.
+> This does not work for all CMIP models! See below for a list of models that pass the rudimentary tests.
 
 
 
@@ -92,7 +95,7 @@ ACCESS-CM2
 
 
 
-This code is © Benoît Pasquier (2024), and it is made available under the MIT license enclosed with the software.
+This code is © Benoît Pasquier (2024) and contributors, and it is made available under the MIT license enclosed with the software.
 
 Over and above the legal restrictions imposed by this license, if you use this software for an academic publication then you are obliged to provide proper attribution.
 This can be to this code directly,
@@ -100,7 +103,7 @@ This can be to this code directly,
 > Benoît Pasquier (2024) “OceanTransportMatrixBuilder.jl: A Julia package to build ocean transport matrices from CMIP model output”. Zenodo. doi: 10.5281/zenodo.13864524.
 
 or to the paper (currently in preparation) that describes it, or (ideally) both.
-You can also find the citations in BibTeX format in the `CITATION.bib` file.
+You can also find the citation(s) in BibTeX format in the `CITATION.bib` file.
 
 
 ## Acknowledgements
