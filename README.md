@@ -31,26 +31,37 @@ using OceanTransportMatrixBuilder
 
 inputdir = "/Users/benoitpasquier/Data/TMIP/data/ACCESS-ESM1-5/historical/r1i1p1f1/Jan1990-Dec1999" # <- this is the path on my mac*x*e
 
-# Load umo, vmo, mlotst, volcello, and areacello
+# Load datasets
 umo_ds = open_dataset(joinpath(inputdir, "umo.nc"))
 vmo_ds = open_dataset(joinpath(inputdir, "vmo.nc"))
 mlotst_ds = open_dataset(joinpath(inputdir, "mlotst.nc"))
 volcello_ds = open_dataset(joinpath(inputdir, "volcello.nc"))
 areacello_ds = open_dataset(joinpath(inputdir, "areacello.nc"))
 
-mlotst = mlotst_ds.mlotst |> Array{Float64}
+# These are the variables required
+umo = umo_ds.umo # mass transport across "east" cell face
+vmo = vmo_ds.vmo # mass transport across "north" cell face
+mlotst = mlotst_ds.mlotst # MLD
+areacello = areacello_ds.areacello # top area of cells
+volcello = volcello_ds.volcello # volume of cells
+lon = volcello_ds.lon # longitude of cell centers
+lat = volcello_ds.lat # latitude of cell centers
+lev = volcello_ds.lev # depth of cell centers
+lon_vertices = volcello_ds.lon_verticies # cell vertices
+lat_vertices = volcello_ds.lat_verticies # cell vertices
+# vertices name is from xmip bug: https://github.com/jbusecke/xMIP/issues/369
 
 # Make arrays of the flux on each face for each grid cell
-ϕ = facefluxesfrommasstransport(; umo_ds, vmo_ds)
+ϕ = facefluxesfrommasstransport(; umo, vmo)
 
 # Make the required data from grid geometry
-modelgrid = makemodelgrid(; areacello_ds, volcello_ds, mlotst_ds)
+modelgrid = makemodelgrid(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
 
 # Make the indices for going back and forth between 3D and 1D
 indices = makeindices(modelgrid.v3D)
 
 # Some parameter values
-ρ = 1025.0    # density (kg/m^3)
+ρ = 1035.0    # density (kg/m^3)
 κH = 500.0    # horizontal diffusivity (m^2/s)
 κVML = 0.1    # mixed-layer vertical diffusivity (m^2/s)
 κVdeep = 1e-5 # background vertical diffusivity (m^2/s)

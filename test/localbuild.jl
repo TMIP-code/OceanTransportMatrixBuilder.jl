@@ -15,41 +15,53 @@
     # My local directory for input files
     inputdir = "/Users/benoitpasquier/Data/TMIP/data/ACCESS-ESM1-5/historical/r1i1p1f1/Jan1990-Dec1999"
 
-    # Load umo, vmo, mlotst, volcello, and areacello
+    # Load datasets
     umo_ds = open_dataset(joinpath(inputdir, "umo.nc"))
     vmo_ds = open_dataset(joinpath(inputdir, "vmo.nc"))
     uo_ds = open_dataset(joinpath(inputdir, "uo.nc"))
     vo_ds = open_dataset(joinpath(inputdir, "vo.nc"))
-
     mlotst_ds = open_dataset(joinpath(inputdir, "mlotst.nc"))
     volcello_ds = open_dataset(joinpath(inputdir, "volcello.nc"))
     areacello_ds = open_dataset(joinpath(inputdir, "areacello.nc"))
 
+    # Load variables
+    umo = umo_ds.umo
+    vmo = vmo_ds.vmo
+    uo = uo_ds.uo
+    vo = vo_ds.vo
+    mlotst = mlotst_ds.mlotst
+    areacello = areacello_ds.areacello
+    volcello = volcello_ds.volcello
+    lon = volcello_ds.lon
+    lat = volcello_ds.lat
+    lev = volcello_ds.lev
+    lon_vertices = volcello_ds.lon_verticies # xmip issue: https://github.com/jbusecke/xMIP/issues/369
+    lat_vertices = volcello_ds.lat_verticies # xmip issue: https://github.com/jbusecke/xMIP/issues/369
+
+    # Plot location of cell center for volcello, umo, vmo, uo, vo
     using GLMakie
     fig = Figure()
     ax = Axis(fig[1,1], xlabel = "lon", ylabel = "lat")
-    lines!(ax, mlotst_ds.lon_verticies[:,1,1] |> Vector, mlotst_ds.lat_verticies[:,1,1] |> Vector)
-    text!(ax, areacello_ds.lon[1], areacello_ds.lat[1]; text="area (i,j)", align = (:center, :bottom))
+    lines!(ax, lon_vertices[:,1,1] |> Vector, lat_vertices[:,1,1] |> Vector)
+    text!(ax, lon[1], lat[1]; text="area (i,j)", align = (:center, :bottom))
     text!(ax, umo_ds.lon[1], umo_ds.lat[1]; text="umo (i,j)", align = (:left, :center))
     text!(ax, uo_ds.lon[1], uo_ds.lat[1]; text="uo (i,j)", align = (:left, :center))
     text!(ax, vmo_ds.lon[1], vmo_ds.lat[1]; text="vmo (i,j)", align = (:center, :bottom))
     text!(ax, vo_ds.lon[1], vo_ds.lat[1]; text="vo (i,j)", align = (:center, :bottom))
     fig
 
-    mlotst = mlotst_ds.mlotst |> Array{Float64}
-
     # Some parameter values
-    ρ = 1025.0    # kg/m^3
+    ρ = 1035.0    # kg/m^3
     κH = 500.0    # m^2/s
     κVML = 0.1    # m^2/s
     κVdeep = 1e-5 # m^2/s
 
     # Make makemodelgrid
-    modelgrid = makemodelgrid(; areacello_ds, volcello_ds, mlotst_ds)
+    modelgrid = makemodelgrid(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
 
     # Make ualldirs
-    ϕ = facefluxesfrommasstransport(; umo_ds, vmo_ds)
-    ϕ_bis = facefluxesfromvelocities(; uo_ds, vo_ds, modelgrid, ρ)
+    ϕ = facefluxesfrommasstransport(; umo, vmo)
+    ϕ_bis = facefluxesfromvelocities(; uo, vo, modelgrid, ρ)
 
     # Make indices
     indices = makeindices(modelgrid.v3D)
@@ -91,18 +103,32 @@ end
         # My local directory for input files
         inputdir = "/Users/benoitpasquier/Data/TMIP/data/$model/historical/$member/Jan1990-Dec1999"
 
-        # Load umo, vmo, mlotst, volcello, and areacello
-        mlotst_ds = open_dataset(joinpath(inputdir, "mlotst.nc"))
+        # Load datasets
         volcello_ds = open_dataset(joinpath(inputdir, "volcello.nc"))
         areacello_ds = open_dataset(joinpath(inputdir, "areacello.nc"))
+        mlotst_ds = open_dataset(joinpath(inputdir, "mlotst.nc"))
+        mlotsts[model] = mlotst_ds.mlotst
+
+        areacello = areacello_ds.areacello
+        volcello = volcello_ds.volcello
+        lon = volcello_ds.lon
+        lat = volcello_ds.lat
+        lev = volcello_ds.lev
+        if model ∈ ("ACCESS-ESM1-5", "ACCESS-CM2")
+            lon_vertices = volcello_ds.lon_verticies # xmip issue: https://github.com/jbusecke/xMIP/issues/369
+            lat_vertices = volcello_ds.lat_verticies # xmip issue: https://github.com/jbusecke/xMIP/issues/369
+        elseif model ∈ ("ACCESS1-3", "ACCESS1-0")
+            lon_vertices = volcello_ds.lon_vertices # no xmip so default key
+            lat_vertices = volcello_ds.lat_vertices # no xmip so default key
+        else
+            error("Need to hardcode the lon_vertices and lat_vertices keys for $model in the tests")
+        end
 
         # Make makemodelgrid
-        modelgrids[model] = makemodelgrid(; areacello_ds, volcello_ds, mlotst_ds)
+        modelgrids[model] = makemodelgrid(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
 
         # Make indices
         indicess[model] = makeindices(modelgrids[model].v3D)
-
-        mlotsts[model] = mlotst_ds.mlotst |> Array{Float64}
 
     end
 

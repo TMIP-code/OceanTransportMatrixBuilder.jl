@@ -21,45 +21,45 @@ end
 
 
 """
-    facefluxesfrommasstransport(; umo_ds, vmo_ds)
+    facefluxesfrommasstransport(; umo, vmo)
 
 Return the fluxes integrated over each cell face (east, west, north, south, top, bottom)
 given mass transport `umo` and `vmo` (fluxes across faces).
 
 See also `facefluxes`.
 """
-function facefluxesfrommasstransport(; umo_ds, vmo_ds)
+function facefluxesfrommasstransport(; umo, vmo)
 
-    @assert :umo ∈ propertynames(umo_ds) && :vmo ∈ propertynames(vmo_ds)
+    FillValue = umo.properties["_FillValue"]
+    @assert isequal(FillValue, vmo.properties["_FillValue"])
 
-    umo = umo_ds.umo |> Array{Float64}
-    vmo = vmo_ds.vmo |> Array{Float64}
-
-    FillValue = umo_ds.umo.properties["_FillValue"]
-    @assert isequal(FillValue, vmo_ds.vmo.properties["_FillValue"])
+    # Convert to Array to avoid slow getindex
+    # Convert to Float64 for double-precision mass conservation
+    umo = umo |> Array{Float64}
+    vmo = vmo |> Array{Float64}
 
     return facefluxes(umo, vmo; FillValue)
 
 end
 
 """
-    facefluxesfromvelocities(; uo_ds, vo_ds, modelgrid, ρ)
+    facefluxesfromvelocities(; uo, vo, modelgrid, ρ)
 
 Return the fluxes integrated over each cell face (east, west, north, south, top, bottom)
-given either `uo_ds`, `vo_ds`, `modelgrid`, and `ρ`.
+given either `uo`, `vo`, `modelgrid`, and `ρ`.
 
 See also `facefluxes`.
 """
-function facefluxesfromvelocities(; uo_ds, vo_ds, modelgrid, ρ)
+function facefluxesfromvelocities(; uo, vo, modelgrid, ρ)
 
-    @assert :uo ∈ propertynames(uo_ds) && :vo ∈ propertynames(vo_ds)
+    FillValue = uo.properties["_FillValue"]
+    @assert isequal(FillValue, vo.properties["_FillValue"])
 
-    uo = uo_ds.uo |> Array{Float64}
-    vo = vo_ds.vo |> Array{Float64}
+    # Convert to Array to avoid slow getindex
+    # Convert to Float64 for double-precision mass conservation
+    uo = uo |> Array{Float64}
+    vo = vo |> Array{Float64}
     umo, vmo = velocity2fluxes(; uo, vo, modelgrid, ρ)
-
-    FillValue = uo_ds.uo.properties["_FillValue"]
-    @assert isequal(FillValue, vo_ds.vo.properties["_FillValue"])
 
     return facefluxes(umo, vmo; FillValue)
 
@@ -122,37 +122,29 @@ function facefluxes(umo, vmo; FillValue)
 end
 
 
-function makemodelgrid(; areacello_ds, volcello_ds, mlotst_ds)
+function makemodelgrid(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
 
 	# volume (3D)
-    volcello = volcello_ds["volcello"]
     FillValue = volcello.properties["_FillValue"]
     v3D = volcello |> Array{Union{Missing, Float64}}
 	v3D = replace(v3D, missing => NaN, 0 => NaN, FillValue => NaN)
 
     # area (2D)
-    areacello = areacello_ds["areacello"]
     FillValue = areacello.properties["_FillValue"]
     area2D = areacello |> Array{Float64}
     area2D = replace(area2D, missing => NaN, 0 => NaN, FillValue => NaN)
 
 	# depth and cell height (3D)
 	DZT3d = v3D ./ area2D
-	zt = volcello_ds["lev"] |> Array
-    volcello_variable_names = propertynames(volcello_ds) .|> string
-    # In order for the online CI test to pass, I must do some of the xmip work myself...
-    # lat_var_name is the shortest string in volcello_variable_names that contains "lat"
-    lat_var_name = first(sort(filter(x -> occursin("lat", x), volcello_variable_names), by=length))
-    lat = volcello_ds[lat_var_name] |> Array
-    # same with lon
-    lon_var_name = first(sort(filter(x -> occursin("lon", x), volcello_variable_names), by=length))
-    lon = volcello_ds[lon_var_name] |> Array
+	zt = lev |> Array
+
+    lat = lat |> Array
+    lon = lon |> Array
+
     # same with lon_vertices
-    mlotst_variable_names = propertynames(mlotst_ds) .|> string
-    lon_vertices_var_name = first(sort(filter(x -> occursin("lon", x) && occursin("vert", x), mlotst_variable_names), by=length))
-    lat_vertices_var_name = first(sort(filter(x -> occursin("lat", x) && occursin("vert", x), mlotst_variable_names), by=length))
-    lon_vertices = mlotst_ds[lon_vertices_var_name] |> Array .|> float
-    lat_vertices = mlotst_ds[lat_vertices_var_name] |> Array .|> float
+    lon_vertices = lon_vertices |> Array .|> float
+    lat_vertices = lat_vertices |> Array .|> float
+
     # sort the vertices to mathc the default orientation
     vertexidx = vertexpermutation(lon_vertices, lat_vertices)
     lon_vertices = lon_vertices[vertexidx,:,:]
@@ -263,6 +255,7 @@ function centroid2edgedistance(lon, lat, vlon, vlat, i, j, dir)
     M = midpointonsphere(A, B)
     haversine(C, M)
 end
+
 function midpointonsphere(A, B)
     if abs(A[1] - B[1]) < 180
         (A .+ B) ./ 2

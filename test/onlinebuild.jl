@@ -38,7 +38,7 @@
     uo_zarr = zopen(uo_store, consolidated=true)
     vo_zarr = zopen(vo_store, consolidated=true)
 
-    @info "Eagerly Load data at first time step to limit download size"
+    @info "Eagerly Load datasets at first time step to limit download size"
     volcello_ds = open_dataset(volcello_zarr)
     areacello_ds = open_dataset(areacello_zarr)
     mlotst_ds = open_dataset(mlotst_zarr)[time = 1]
@@ -47,20 +47,32 @@
     uo_ds = open_dataset(uo_zarr)[time = 1]
     vo_ds = open_dataset(vo_zarr)[time = 1]
 
-    mlotst = mlotst_ds.mlotst |> Array{Float64}
+    @info "Load variables"
+    umo = umo_ds.umo
+    vmo = vmo_ds.vmo
+    uo = uo_ds.uo
+    vo = vo_ds.vo
+    mlotst = mlotst_ds.mlotst
+    areacello = areacello_ds.areacello
+    volcello = volcello_ds.volcello
+    lon = volcello_ds.longitude
+    lat = volcello_ds.latitude
+    lev = volcello_ds.lev
+    lon_vertices = volcello_ds.vertices_longitude # no xmip so must use default dataset propery names
+    lat_vertices = volcello_ds.vertices_latitude # no xmip so must use default dataset propery names
 
     # Some parameter values
-    ρ = 1025.0    # kg/m^3
+    ρ = 1035.0    # kg/m^3
     κH = 500.0    # m^2/s
     κVML = 0.1    # m^2/s
     κVdeep = 1e-5 # m^2/s
 
     # Make makemodelgrid
-    modelgrid = makemodelgrid(; areacello_ds, volcello_ds, mlotst_ds)
+    modelgrid = makemodelgrid(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
 
     # Make ualldirs
-    ϕ = facefluxesfrommasstransport(; umo_ds, vmo_ds)
-    ϕ_bis = facefluxesfromvelocities(; uo_ds, vo_ds, modelgrid, ρ)
+    ϕ = facefluxesfrommasstransport(; umo, vmo)
+    ϕ_bis = facefluxesfromvelocities(; uo, vo, modelgrid, ρ)
 
     for dir in (:east, :west, :north, :south, :top, :bottom)
         @test_broken isapprox(getpropery(ϕ, dir), getpropery(ϕ_bis, dir), rtol = 0.1)

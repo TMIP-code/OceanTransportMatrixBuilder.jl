@@ -51,6 +51,8 @@ function buildTκVML(; mlotst, modelgrid, indices, κVML)
     # Unpack indices
     (; Lwet) = indices
 
+	mlotst = mlotst |> Array # to prevent slow getindex for lazily loaded data?
+
 	# Wet mask for mixed layer diffusivity
 	Ω = replace(reshape(zt, 1, 1, length(zt)) .< mlotst, missing=>false)[Lwet]
 
@@ -291,7 +293,7 @@ function horizontal_diffusion_operator_sparse_entries(; modelgrid, indices, κH,
 		iW, jW = mod1(i - 1, nx), j
 		𝑗W = Lwet3D[iW, jW, k]
         # (𝑖 == 𝑗W) && @show(i, j, iW, jW)
-        if !ismissing(𝑗W)
+        if !ismissing(𝑗W) && ΩH[𝑗W]
             # I take the minimum area from both dirs (through which mixing goes through)
             aij = verticalfacearea(edge_length_2D, DZT3d, i, j, k, :west)
             aji = verticalfacearea(edge_length_2D, DZT3d, iW, jW, k, :east)
@@ -306,7 +308,7 @@ function horizontal_diffusion_operator_sparse_entries(; modelgrid, indices, κH,
 		iE, jE = mod1(i + 1, nx), j
 		𝑗E = Lwet3D[iE, jE, k]
         # (𝑖 == 𝑗E) && @show(i, j, iE, jE)
-        if !ismissing(𝑗E)
+        if !ismissing(𝑗E) && ΩH[𝑗E]
             aij = verticalfacearea(edge_length_2D, DZT3d, i, j, k, :east)
             aji = verticalfacearea(edge_length_2D, DZT3d, iE, jE, k, :west)
             a = min(aij, aji)
@@ -320,7 +322,7 @@ function horizontal_diffusion_operator_sparse_entries(; modelgrid, indices, κH,
             iS, jS = i, j - 1
             𝑗S = Lwet3D[iS, jS, k]
             # (𝑖 == 𝑗S) && @show(i, j, iS, jS)
-            if !ismissing(𝑗S)
+            if !ismissing(𝑗S) && ΩH[𝑗S]
                 aij = verticalfacearea(edge_length_2D, DZT3d, i, j, k, :south)
                 aji = verticalfacearea(edge_length_2D, DZT3d, iS, jS, k, :north)
                 a = min(aij, aji)
@@ -335,7 +337,7 @@ function horizontal_diffusion_operator_sparse_entries(; modelgrid, indices, κH,
         (iN, jN, oppdir) = (j == ny) ? (nx - i + 1, j, :north) : (i, j + 1, :south)
         𝑗N = Lwet3D[iN, jN, k]
         # (𝑖 == 𝑗N) && @show(i, j, iN, jN)
-        if !ismissing(𝑗N)
+        if !ismissing(𝑗N) && ΩH[𝑗N]
             aij = verticalfacearea(edge_length_2D, DZT3d, i, j, k, :north)
             aji = verticalfacearea(edge_length_2D, DZT3d, iN, jN, k, oppdir)
             a = min(aij, aji)
