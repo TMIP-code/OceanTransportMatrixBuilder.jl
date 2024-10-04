@@ -1,13 +1,18 @@
 
 """
-    velocity2fluxes(uo, vo; modelgrid, ρ)
+    velocity2fluxes(uo_ds, vo_ds; modelgrid, ρ)
 
-Return the fluxes (integrated over cell faces) given veloticies `uo` and `vo`.
+Return the fluxes (integrated over cell faces) given veloticies `uo_ds` and `vo_ds`.
+
+The datasets are required to access the longitude and latitude of the velocity points.
 """
-function velocity2fluxes(; uo, vo, modelgrid, ρ)
+function velocity2fluxes(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, ρ)
 
     # Unpack modelgrid
     (; DZT3d, edge_length_2D) = modelgrid
+
+    # Interpolate to C-grid
+    uo, _, _, vo, _, _ = interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid)
 
     # Calculate fluxes from velocities
     umo = @. uo * ρ * DZT3d * edge_length_2D[:east]
@@ -33,7 +38,7 @@ function facefluxesfrommasstransport(; umo, vmo)
     FillValue = umo.properties["_FillValue"]
     @assert isequal(FillValue, vmo.properties["_FillValue"])
 
-    # Convert to Array to avoid slow getindex
+    # Convert to in-memory Array to avoid slow getindex
     # Convert to Float64 for double-precision mass conservation
     umo = umo |> Array{Float64}
     vmo = vmo |> Array{Float64}
@@ -50,16 +55,14 @@ given either `uo`, `vo`, `modelgrid`, and `ρ`.
 
 See also `facefluxes`.
 """
-function facefluxesfromvelocities(; uo, vo, modelgrid, ρ)
+function facefluxesfromvelocities(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, ρ)
 
     FillValue = uo.properties["_FillValue"]
     @assert isequal(FillValue, vo.properties["_FillValue"])
 
-    # Convert to Array to avoid slow getindex
+    # Convert to in-memory Array to avoid slow getindex
     # Convert to Float64 for double-precision mass conservation
-    uo = uo |> Array{Float64}
-    vo = vo |> Array{Float64}
-    umo, vmo = velocity2fluxes(; uo, vo, modelgrid, ρ)
+    umo, vmo = velocity2fluxes(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, ρ)
 
     return facefluxes(umo, vmo; FillValue)
 
@@ -142,8 +145,8 @@ function makemodelgrid(; areacello, volcello, lon, lat, lev, lon_vertices, lat_v
     lon = lon |> Array
 
     # same with lon_vertices
-    lon_vertices = lon_vertices |> Array .|> float
-    lat_vertices = lat_vertices |> Array .|> float
+    lon_vertices = lon_vertices |> Array{Float64}
+    lat_vertices = lat_vertices |> Array{Float64}
 
     # sort the vertices to mathc the default orientation
     vertexidx = vertexpermutation(lon_vertices, lat_vertices)
@@ -209,7 +212,6 @@ function vertexpermutation(lon_vertices, lat_vertices)
     idx4 = only(setdiff(idx_north, idx3)) # common to (i,j) and (i,j+1) only
     idx1 = only(setdiff(1:4, idx2, idx3, idx4)) # only in (i,j)
     return [idx1, idx2, idx3, idx4]
-
 end
 
 # View form top for vlon and vlat vertices
@@ -280,3 +282,6 @@ function horizontalcentroiddistance(distance_to_edge_2D, iA, jA, iB, jB, dir)
         distance_to_edge_2D[:east][iA, jA] + distance_to_edge_2D[:west][iB, jB]
     end
 end
+
+
+

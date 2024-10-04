@@ -24,19 +24,28 @@
     volcello_ds = open_dataset(joinpath(inputdir, "volcello.nc"))
     areacello_ds = open_dataset(joinpath(inputdir, "areacello.nc"))
 
-    # Load variables
-    umo = umo_ds.umo
-    vmo = vmo_ds.vmo
-    uo = uo_ds.uo
-    vo = vo_ds.vo
-    mlotst = mlotst_ds.mlotst
-    areacello = areacello_ds.areacello
-    volcello = volcello_ds.volcello
-    lon = volcello_ds.lon
-    lat = volcello_ds.lat
+    # Load variables in memory
+    umo = readcubedata(umo_ds.umo)
+    vmo = readcubedata(vmo_ds.vmo)
+    umo_lon = readcubedata(umo_ds.lon)
+    umo_lat = readcubedata(umo_ds.lat)
+    vmo_lon = readcubedata(vmo_ds.lon)
+    vmo_lat = readcubedata(vmo_ds.lat)
+    mlotst = readcubedata(mlotst_ds.mlotst)
+    areacello = readcubedata(areacello_ds.areacello)
+    volcello = readcubedata(volcello_ds.volcello)
+    lon = readcubedata(volcello_ds.lon)
+    lat = readcubedata(volcello_ds.lat)
     lev = volcello_ds.lev
-    lon_vertices = volcello_ds.lon_verticies # xmip issue: https://github.com/jbusecke/xMIP/issues/369
-    lat_vertices = volcello_ds.lat_verticies # xmip issue: https://github.com/jbusecke/xMIP/issues/369
+    lon_vertices = readcubedata(volcello_ds.lon_verticies) # xmip issue: https://github.com/jbusecke/xMIP/issues/369
+    lat_vertices = readcubedata(volcello_ds.lat_verticies) # xmip issue: https://github.com/jbusecke/xMIP/issues/369
+
+    uo = readcubedata(uo_ds.uo)
+    vo = readcubedata(vo_ds.vo)
+    uo_lon = readcubedata(uo_ds.lon)
+    uo_lat = readcubedata(uo_ds.lat)
+    vo_lon = readcubedata(vo_ds.lon)
+    vo_lat = readcubedata(vo_ds.lat)
 
     # Plot location of cell center for volcello, umo, vmo, uo, vo
     using GLMakie
@@ -44,11 +53,12 @@
     ax = Axis(fig[1,1], xlabel = "lon", ylabel = "lat")
     lines!(ax, lon_vertices[:,1,1] |> Vector, lat_vertices[:,1,1] |> Vector)
     text!(ax, lon[1], lat[1]; text="area (i,j)", align = (:center, :bottom))
-    text!(ax, umo_ds.lon[1], umo_ds.lat[1]; text="umo (i,j)", align = (:left, :center))
-    text!(ax, uo_ds.lon[1], uo_ds.lat[1]; text="uo (i,j)", align = (:left, :center))
-    text!(ax, vmo_ds.lon[1], vmo_ds.lat[1]; text="vmo (i,j)", align = (:center, :bottom))
-    text!(ax, vo_ds.lon[1], vo_ds.lat[1]; text="vo (i,j)", align = (:center, :bottom))
+    text!(ax, umo_lon[1], umo_lat[1]; text="umo (i,j)", align = (:left, :center))
+    text!(ax, uo_lon[1], uo_lat[1]; text="uo (i,j)", align = (:left, :center))
+    text!(ax, umo_lon[1], umo_lat[1]; text="vmo (i,j)", align = (:center, :bottom))
+    text!(ax, vo_lon[1], vo_lat[1]; text="vo (i,j)", align = (:center, :bottom))
     fig
+
 
     # Some parameter values
     ρ = 1035.0    # kg/m^3
@@ -58,17 +68,50 @@
 
     # Make makemodelgrid
     modelgrid = makemodelgrid(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
+    (; lon_vertices, lat_vertices) = modelgrid
 
-    # Make ualldirs
+
+
+    # Make fuxes from all directions
     ϕ = facefluxesfrommasstransport(; umo, vmo)
-    ϕ_bis = facefluxesfromvelocities(; uo, vo, modelgrid, ρ)
+
+    # Make fuxes from all directions from velocities
+    ϕ_bis = facefluxesfromvelocities(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, ρ)
 
     # Make indices
     indices = makeindices(modelgrid.v3D)
 
+    uo2, uo2_lon, uo2_lat, vo2, vo2_lon, vo2_lat = OceanTransportMatrixBuilder.interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid)
+    fig = Figure(size=(1500, 800))
+    ax = Axis(fig[1,1], xlabel = "lon", ylabel = "lat", xgridvisible = false, ygridvisible = false)
+    i = 85 .+ (-1:5); j = 2 .+ (-1:4); k = 1
+    [poly!(ax, lon_vertices[:,i,j] |> vec, lat_vertices[:,i,j] |> vec, color = (:blue, 0.1)) for i in i for j in j if indices.wet3D[i,j,1]];
+    [lines!(ax, lon_vertices[:,i,j] |> vec, lat_vertices[:,i,j] |> vec, color = (:black, 0.1)) for i in i for j in j];
+    # lines!(ax, lon_vertices[1,i,j] |> Array, lat_vertices[1,i,j] |> Array, color = :black)
+    arrows!(ax, uo_lon[i,j,k] |> vec, uo_lat[i,j,k] |> vec, uo[i,j,k] |> vec, 0uo[i,j,k] |> vec, arrowsize = 10, lengthscale = 10, arrowcolor = :darkblue, linecolor = :darkblue)
+    arrows!(ax, vo_lon[i,j,k] |> vec, vo_lat[i,j,k] |> vec, 0vo[i,j,k] |> vec, vo[i,j,k] |> vec, arrowsize = 10, lengthscale = 10, arrowcolor = :darkred, linecolor = :darkred)
+    arrows!(ax, uo2_lon[i,j,k] |> vec, uo2_lat[i,j,k] |> vec, uo2[i,j,k] |> vec, 0uo2[i,j,k] |> vec, arrowsize = 10, lengthscale = 10, arrowcolor = :blue, linecolor = :blue)
+    arrows!(ax, vo2_lon[i,j,k] |> vec, vo2_lat[i,j,k] |> vec, 0vo2[i,j,k] |> vec, vo2[i,j,k] |> vec, arrowsize = 10, lengthscale = 10, arrowcolor = :red, linecolor = :red)
+    arrows!(ax, uo2_lon[i,j,k] |> vec, uo2_lat[i,j,k] .+ 0.02 |> vec, umo[i,j,k] |> vec, 0umo[i,j,k] |> vec, arrowsize = 10, lengthscale = 3e-8, arrowcolor = (:blue, 0.3), linecolor = (:blue, 0.3))
+    arrows!(ax, vo2_lon[i,j,k] .+ 0.02 |> vec, vo2_lat[i,j,k] |> vec, 0vmo[i,j,k] |> vec, vmo[i,j,k] |> vec, arrowsize = 10, lengthscale = 3e-8, arrowcolor = (:red, 0.3), linecolor = (:red, 0.3))
+    fig
+    ax = Axis(fig[1,2], xlabel = "lon", ylabel = "lat", xgridvisible = false, ygridvisible = false)
+    i = 160 .+ (-3:3); j = 200 .+ (-2:2); k = 1
+    [poly!(ax, lon_vertices[:,i,j] |> vec, lat_vertices[:,i,j] |> vec, color = (:blue, 0.1)) for i in i for j in j if indices.wet3D[i,j,1]];
+    [lines!(ax, lon_vertices[:,i,j] |> vec, lat_vertices[:,i,j] |> vec, color = (:black, 0.1)) for i in i for j in j];
+    # lines!(ax, lon_vertices[1,i,j] |> Array, lat_vertices[1,i,j] |> Array, color = :black)
+    arrows!(ax, uo_lon[i,j,k] |> vec, uo_lat[i,j,k] |> vec, uo[i,j,k] |> vec, 0uo[i,j,k] |> vec, arrowsize = 10, lengthscale = 10, arrowcolor = :darkblue, linecolor = :darkblue)
+    arrows!(ax, vo_lon[i,j,k] |> vec, vo_lat[i,j,k] |> vec, 0vo[i,j,k] |> vec, vo[i,j,k] |> vec, arrowsize = 10, lengthscale = 10, arrowcolor = :darkred, linecolor = :darkred)
+    arrows!(ax, uo2_lon[i,j,k] |> vec, uo2_lat[i,j,k] |> vec, uo2[i,j,k] |> vec, 0uo2[i,j,k] |> vec, arrowsize = 10, lengthscale = 10, arrowcolor = :blue, linecolor = :blue)
+    arrows!(ax, vo2_lon[i,j,k] |> vec, vo2_lat[i,j,k] |> vec, 0vo2[i,j,k] |> vec, vo2[i,j,k] |> vec, arrowsize = 10, lengthscale = 10, arrowcolor = :red, linecolor = :red)
+    arrows!(ax, uo2_lon[i,j,k] |> vec, uo2_lat[i,j,k] .+ 0.02 |> vec, umo[i,j,k] |> vec, 0umo[i,j,k] |> vec, arrowsize = 10, lengthscale = 1e-8, arrowcolor = (:blue, 0.3), linecolor = (:blue, 0.3))
+    arrows!(ax, vo2_lon[i,j,k] .+ 0.02 |> vec, vo2_lat[i,j,k] |> vec, 0vmo[i,j,k] |> vec, vmo[i,j,k] |> vec, arrowsize = 10, lengthscale = 1e-8, arrowcolor = (:red, 0.3), linecolor = (:red, 0.3))
+    fig
+
     fig = Figure()
     ax = Axis(fig[1,1], xlabel = "i", ylabel = "j")
     hm = heatmap!(ax, indices.wet3D[:,:,1])
+    translate!(hm, 0, 0, -100) # move the plot behind the grid
     fig
 
     # Make transport matrix
@@ -107,19 +150,21 @@ end
         volcello_ds = open_dataset(joinpath(inputdir, "volcello.nc"))
         areacello_ds = open_dataset(joinpath(inputdir, "areacello.nc"))
         mlotst_ds = open_dataset(joinpath(inputdir, "mlotst.nc"))
-        mlotsts[model] = mlotst_ds.mlotst
 
-        areacello = areacello_ds.areacello
-        volcello = volcello_ds.volcello
-        lon = volcello_ds.lon
-        lat = volcello_ds.lat
+        # Load variables in memory
+        mlotsts[model] = readcubedata(mlotst_ds.mlotst)
+
+        areacello = readcubedata(areacello_ds.areacello)
+        volcello = readcubedata(volcello_ds.volcello)
+        lon = readcubedata(volcello_ds.lon)
+        lat = readcubedata(volcello_ds.lat)
         lev = volcello_ds.lev
         if model ∈ ("ACCESS-ESM1-5", "ACCESS-CM2")
-            lon_vertices = volcello_ds.lon_verticies # xmip issue: https://github.com/jbusecke/xMIP/issues/369
-            lat_vertices = volcello_ds.lat_verticies # xmip issue: https://github.com/jbusecke/xMIP/issues/369
+            lon_vertices = readcubedata(volcello_ds.lon_verticies) # xmip issue: https://github.com/jbusecke/xMIP/issues/369
+            lat_vertices = readcubedata(volcello_ds.lat_verticies) # xmip issue: https://github.com/jbusecke/xMIP/issues/369
         elseif model ∈ ("ACCESS1-3", "ACCESS1-0")
-            lon_vertices = volcello_ds.lon_vertices # no xmip so default key
-            lat_vertices = volcello_ds.lat_vertices # no xmip so default key
+            lon_vertices = readcubedata(volcello_ds.lon_vertices) # no xmip so default key
+            lat_vertices = readcubedata(volcello_ds.lat_vertices) # no xmip so default key
         else
             error("Need to hardcode the lon_vertices and lat_vertices keys for $model in the tests")
         end
@@ -271,18 +316,14 @@ end
     end
 
     # Difference between the fluxes from velocities and mass transport
-    (; uo_ds, vo_ds, umo_ds, vmo_ds, modelgrid, ρ) = LocalBuiltMatrix
-    uo = uo_ds.uo |> Array{Float64}
-    vo = vo_ds.vo |> Array{Float64}
-    umo = umo_ds.umo |> Array{Float64}
-    vmo = vmo_ds.vmo |> Array{Float64}
-    umo_bis, vmo_bis = OceanTransportMatrixBuilder.velocity2fluxes(; uo, vo, modelgrid, ρ)
+    (; uo, vo, umo, vmo, uo_lon, uo_lat, vo_lon, vo_lat, modelgrid, ρ) = LocalBuiltMatrix
+    umo_bis, vmo_bis = velocity2fluxes(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, ρ)
     colorrange = 1e9 .* (-1, 1)
     colormap = cgrad(:RdBu, rev=true)
-    Δcolorrange = (-100, 100)
+    Δcolorrange = (-5, 5)
     Δcolormap = cgrad(:PRGn, rev=true)
-    # for k in axes(umo, 3)
-    for k in [1]
+    for k in axes(umo, 3)
+    # for k in [1]
         local fig = Figure(size=(1200, 500))
 
         local ax = Axis(fig[1,1], xlabel = "i", ylabel = "j")

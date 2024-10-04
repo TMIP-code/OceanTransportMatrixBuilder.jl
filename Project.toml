@@ -1,7 +1,7 @@
 name = "OceanTransportMatrixBuilder"
 uuid = "c2b4a04e-6049-4fc4-aa6a-5508a29a1e1c"
 authors = ["Benoit Pasquier <briochemc@gmail.com> and contributors"]
-version = "0.2.0"
+version = "0.2.1"
 
 [deps]
 Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"

@@ -38,7 +38,7 @@
     uo_zarr = zopen(uo_store, consolidated=true)
     vo_zarr = zopen(vo_store, consolidated=true)
 
-    @info "Eagerly Load datasets at first time step to limit download size"
+    @info "Select first time step to limit download size"
     volcello_ds = open_dataset(volcello_zarr)
     areacello_ds = open_dataset(areacello_zarr)
     mlotst_ds = open_dataset(mlotst_zarr)[time = 1]
@@ -47,19 +47,23 @@
     uo_ds = open_dataset(uo_zarr)[time = 1]
     vo_ds = open_dataset(vo_zarr)[time = 1]
 
-    @info "Load variables"
-    umo = umo_ds.umo
-    vmo = vmo_ds.vmo
-    uo = uo_ds.uo
-    vo = vo_ds.vo
-    mlotst = mlotst_ds.mlotst
-    areacello = areacello_ds.areacello
-    volcello = volcello_ds.volcello
-    lon = volcello_ds.longitude
-    lat = volcello_ds.latitude
+    @info "Load variables in memory"
+    umo = readcubedata(umo_ds.umo)
+    vmo = readcubedata(vmo_ds.vmo)
+    uo = readcubedata(uo_ds.uo)
+    vo = readcubedata(vo_ds.vo)
+    uo_lon = readcubedata(uo_ds.longitude)
+    uo_lat = readcubedata(uo_ds.latitude)
+    vo_lon = readcubedata(vo_ds.longitude)
+    vo_lat = readcubedata(vo_ds.latitude)
+    mlotst = readcubedata(mlotst_ds.mlotst)
+    areacello = readcubedata(areacello_ds.areacello)
+    volcello = readcubedata(volcello_ds.volcello)
+    lon = readcubedata(volcello_ds.longitude)
+    lat = readcubedata(volcello_ds.latitude)
     lev = volcello_ds.lev
-    lon_vertices = volcello_ds.vertices_longitude # no xmip so must use default dataset propery names
-    lat_vertices = volcello_ds.vertices_latitude # no xmip so must use default dataset propery names
+    lon_vertices = readcubedata(volcello_ds.vertices_longitude) # no xmip so must use default dataset propery names
+    lat_vertices = readcubedata(volcello_ds.vertices_latitude) # no xmip so must use default dataset propery names
 
     # Some parameter values
     ρ = 1035.0    # kg/m^3
@@ -70,9 +74,11 @@
     # Make makemodelgrid
     modelgrid = makemodelgrid(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
 
-    # Make ualldirs
+    # Make fuxes from all directions
     ϕ = facefluxesfrommasstransport(; umo, vmo)
-    ϕ_bis = facefluxesfromvelocities(; uo, vo, modelgrid, ρ)
+
+    # Make fuxes from all directions
+    ϕ_bis = facefluxesfromvelocities(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, ρ)
 
     for dir in (:east, :west, :north, :south, :top, :bottom)
         @test_broken isapprox(getpropery(ϕ, dir), getpropery(ϕ_bis, dir), rtol = 0.1)
