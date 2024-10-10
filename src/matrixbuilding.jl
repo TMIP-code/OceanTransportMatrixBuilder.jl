@@ -131,7 +131,7 @@ end
 
 # There are three ways to index:
 # - Cartesian indices (i,j,k)
-# - Linear index Li
+# - Linear index L𝑖
 # - Wet linear index 𝑖 (that's the one we want to record for the matrix)
 # So to fill T[𝑖,𝑗] -ϕ[𝑖→𝑗] / m[𝑖], I need be able to convert, in sequence:
 # 𝑖 -> (i,j,k) -> neihghbour (i′,j′,k′) -> 𝑗
@@ -146,7 +146,7 @@ Return the sparse (i, j, v) for the upwind advection operator Tadv.
 function upwind_advection_operator_sparse_entries(; ϕ, modelgrid, indices, ρ)
 
     # Unpack model grid
-    (; v3D,) = modelgrid
+    (; v3D, gridtype) = modelgrid
     # Unpack indices
     (; wet3D, Lwet, Lwet3D, C) = indices
 
@@ -156,62 +156,56 @@ function upwind_advection_operator_sparse_entries(; ϕ, modelgrid, indices, ρ)
     nx, ny, _ = nxyz
 
     @time for 𝑖 in eachindex(Lwet)
-		Li = Lwet[𝑖]
-		i, j, k = C[Li].I
-		m𝑖 = v3D[i,j,k] * ρ
+		L𝑖 = Lwet[𝑖]
+		C𝑖 = C[L𝑖]
+		i, j, k = C𝑖.I
+		m𝑖 = v3D[C𝑖] * ρ
 		# From West
-		ϕwest = ϕ.west[i,j,k]
+		ϕwest = ϕ.west[C𝑖]
 		if ϕwest > 0
-			i′ = mod1(i - 1, nx)
-			𝑗 = Lwet3D[i′,j,k]
-			ismissing(𝑗) && @show(i, j, k, i′)
-			m𝑗 = v3D[i′,j,k] * ρ
+			C𝑗 = i₋₁(C𝑖, gridtype)
+			𝑗 = Lwet3D[C𝑗]
+			m𝑗 = v3D[C𝑗] * ρ
 			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕwest, m𝑖, m𝑗)
 		end
 		# From East
-		ϕeast = ϕ.east[i,j,k]
+		ϕeast = ϕ.east[C𝑖]
 		if ϕeast < 0
-			i′ = mod1(i + 1, nx)
-			𝑗 = Lwet3D[i′,j,k]
-			m𝑗 = v3D[i′,j,k] * ρ
+			C𝑗 = i₊₁(C𝑖, gridtype)
+			𝑗 = Lwet3D[C𝑗]
+			m𝑗 = v3D[C𝑗] * ρ
 			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, -ϕeast, m𝑖, m𝑗)
 		end
 		# From South
-		ϕsouth = ϕ.south[i,j,k]
+		ϕsouth = ϕ.south[C𝑖]
 		if ϕsouth > 0
-			j′ = j - 1
-			𝑗 = Lwet3D[i,j′,k]
-			m𝑗 = v3D[i,j′,k] * ρ
+			C𝑗 = j₋₁(C𝑖, gridtype)
+			𝑗 = Lwet3D[C𝑗]
+			m𝑗 = v3D[C𝑗] * ρ
 			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕsouth, m𝑖, m𝑗)
 		end
 		# From North (Special case with north bipole)
-		ϕnorth = ϕ.north[i,j,k]
+		ϕnorth = ϕ.north[C𝑖]
 		if ϕnorth < 0
-			if j == ny
-				j′ = j
-				i′ = nx - i + 1
-			else
-				j′ = j + 1
-				i′ = i
-			end
-			𝑗 = Lwet3D[i′,j′,k]
-			m𝑗 = v3D[i′,j′,k] * ρ
+			C𝑗 = j₊₁(C𝑖, gridtype)
+			𝑗 = Lwet3D[C𝑗]
+			m𝑗 = v3D[C𝑗] * ρ
 			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, -ϕnorth, m𝑖, m𝑗)
 		end
 		# From Bottom
-		ϕbottom = ϕ.bottom[i,j,k]
+		ϕbottom = ϕ.bottom[C𝑖]
 		if ϕbottom > 0
-			k′ = k + 1
-			𝑗 = Lwet3D[i,j,k′]
-			m𝑗 = v3D[i,j,k′] * ρ
+			C𝑗 = k₊₁(C𝑖, gridtype)
+			𝑗 = Lwet3D[C𝑗]
+			m𝑗 = v3D[C𝑗] * ρ
 			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕbottom, m𝑖, m𝑗)
 		end
 		# From Top
-		ϕtop = ϕ.top[i,j,k]
+		ϕtop = ϕ.top[C𝑖]
 		if ϕtop < 0 && k > 1 # Evaporation/precipitation -> no change to χ
-			k′ = k - 1
-			𝑗 = Lwet3D[i,j,k′]
-			m𝑗 = v3D[i,j,k′] * ρ
+			C𝑗 = k₋₁(C𝑖, gridtype)
+			𝑗 = Lwet3D[C𝑗]
+			m𝑗 = v3D[C𝑗] * ρ
 			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, -ϕtop, m𝑖, m𝑗)
 		end
 	end
@@ -276,7 +270,7 @@ Return the sparse (i, j, v) for the horizontal diffusion operator TκH.
 function horizontal_diffusion_operator_sparse_entries(; modelgrid, indices, κH, ΩH)
 
     # Unpack model grid
-    (; v3D, edge_length_2D, distance_to_edge_2D, DZT3d) = modelgrid
+    (; v3D, edge_length_2D, distance_to_edge_2D, DZT3d, gridtype) = modelgrid
     # Unpack indices
     (; wet3D, Lwet, Lwet3D, C) = indices
 
@@ -286,65 +280,78 @@ function horizontal_diffusion_operator_sparse_entries(; modelgrid, indices, κH,
 
     @time for 𝑖 in eachindex(Lwet)
         ΩH[𝑖] || continue # only continue if inside ΩH
-		Li = Lwet[𝑖]
-		i, j, k = C[Li].I
-		V = v3D[i,j,k]
+		L𝑖 = Lwet[𝑖]
+		C𝑖 = C[L𝑖]
+		i, j, k = C𝑖.I
+		V = v3D[C𝑖]
 		# From West
-		iW, jW = mod1(i - 1, nx), j
-		𝑗W = Lwet3D[iW, jW, k]
-        # (𝑖 == 𝑗W) && @show(i, j, iW, jW)
-        if !ismissing(𝑗W) && ΩH[𝑗W]
-            # I take the minimum area from both dirs (through which mixing goes through)
-            aij = verticalfacearea(edge_length_2D, DZT3d, i, j, k, :west)
-            aji = verticalfacearea(edge_length_2D, DZT3d, iW, jW, k, :east)
-            a = min(aij, aji)
-            # I take the mean distance from both dirs
-            dij = horizontalcentroiddistance(distance_to_edge_2D, i, j, iW, jW, :west)
-            dji = horizontalcentroiddistance(distance_to_edge_2D, iW, jW, i, j, :east)
-            d = (dij + dji) / 2
-			pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗W, κH, a, d, V)
+		C𝑗W = i₋₁(C𝑖, gridtype)
+        if !isnothing(C𝑗W)
+			𝑗W = Lwet3D[C𝑗W]
+			if !ismissing(𝑗W) && ΩH[𝑗W]
+				iW, jW, _ = C𝑗W.I
+				# (𝑖 == 𝑗W) && @show(i, j, iW, jW)
+				# I take the minimum area from both dirs (through which mixing goes through)
+				aij = verticalfacearea(edge_length_2D, DZT3d, i, j, k, :west)
+				aji = verticalfacearea(edge_length_2D, DZT3d, iW, jW, k, :east)
+				a = min(aij, aji)
+				# I take the mean distance from both dirs
+				dij = horizontalcentroiddistance(distance_to_edge_2D, i, j, iW, jW, :west)
+				dji = horizontalcentroiddistance(distance_to_edge_2D, iW, jW, i, j, :east)
+				d = (dij + dji) / 2
+				pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗W, κH, a, d, V)
+			end
 		end
         # From East
-		iE, jE = mod1(i + 1, nx), j
-		𝑗E = Lwet3D[iE, jE, k]
-        # (𝑖 == 𝑗E) && @show(i, j, iE, jE)
-        if !ismissing(𝑗E) && ΩH[𝑗E]
-            aij = verticalfacearea(edge_length_2D, DZT3d, i, j, k, :east)
-            aji = verticalfacearea(edge_length_2D, DZT3d, iE, jE, k, :west)
-            a = min(aij, aji)
-            dij = horizontalcentroiddistance(distance_to_edge_2D, i, j, iE, jE, :east)
-            dji = horizontalcentroiddistance(distance_to_edge_2D, iE, jE, i, j, :west)
-            d = (dij + dji) / 2
-			pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗E, κH, a, d, V)
+		C𝑗E = i₊₁(C𝑖, gridtype)
+        if !isnothing(C𝑗E)
+			𝑗E = Lwet3D[C𝑗E]
+			if !ismissing(𝑗E) && ΩH[𝑗E]
+				iE, jE, _ = C𝑗E.I
+				# (𝑖 == 𝑗E) && @show(i, j, iE, jE)
+				aij = verticalfacearea(edge_length_2D, DZT3d, i, j, k, :east)
+				aji = verticalfacearea(edge_length_2D, DZT3d, iE, jE, k, :west)
+				a = min(aij, aji)
+				dij = horizontalcentroiddistance(distance_to_edge_2D, i, j, iE, jE, :east)
+				dji = horizontalcentroiddistance(distance_to_edge_2D, iE, jE, i, j, :west)
+				d = (dij + dji) / 2
+				pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗E, κH, a, d, V)
+			end
 		end
         # From South
-        if j > 1
-            iS, jS = i, j - 1
-            𝑗S = Lwet3D[iS, jS, k]
-            # (𝑖 == 𝑗S) && @show(i, j, iS, jS)
-            if !ismissing(𝑗S) && ΩH[𝑗S]
-                aij = verticalfacearea(edge_length_2D, DZT3d, i, j, k, :south)
-                aji = verticalfacearea(edge_length_2D, DZT3d, iS, jS, k, :north)
-                a = min(aij, aji)
-                dij = horizontalcentroiddistance(distance_to_edge_2D, i, j, iS, jS, :south)
-                dji = horizontalcentroiddistance(distance_to_edge_2D, iS, jS, i, j, :north)
-                d = (dij + dji) / 2
-                pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗S, κH, a, d, V)
-            end
-        end
+		C𝑗S = j₋₁(C𝑖, gridtype)
+		if !isnothing(C𝑗S)
+			𝑗S = Lwet3D[C𝑗S]
+			if !ismissing(𝑗S) && ΩH[𝑗S]
+				iS, jS, _ = C𝑗S.I
+				# (𝑖 == 𝑗S) && @show(i, j, iS, jS)
+				aij = verticalfacearea(edge_length_2D, DZT3d, i, j, k, :south)
+				aji = verticalfacearea(edge_length_2D, DZT3d, iS, jS, k, :north)
+				a = min(aij, aji)
+				dij = horizontalcentroiddistance(distance_to_edge_2D, i, j, iS, jS, :south)
+				dji = horizontalcentroiddistance(distance_to_edge_2D, iS, jS, i, j, :north)
+				d = (dij + dji) / 2
+				pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗S, κH, a, d, V)
+			end
+		end
         # From North
-        # Note that the opposite direction (oppdir) is still north at j == ny
-        (iN, jN, oppdir) = (j == ny) ? (nx - i + 1, j, :north) : (i, j + 1, :south)
-        𝑗N = Lwet3D[iN, jN, k]
-        # (𝑖 == 𝑗N) && @show(i, j, iN, jN)
-        if !ismissing(𝑗N) && ΩH[𝑗N]
-            aij = verticalfacearea(edge_length_2D, DZT3d, i, j, k, :north)
-            aji = verticalfacearea(edge_length_2D, DZT3d, iN, jN, k, oppdir)
-            a = min(aij, aji)
-            dij = horizontalcentroiddistance(distance_to_edge_2D, i, j, iN, jN, :north)
-            dji = horizontalcentroiddistance(distance_to_edge_2D, iN, jN, i, j, oppdir)
-            d = (dij + dji) / 2
-            pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗N, κH, a, d, V)
+		C𝑗N = j₊₁(C𝑖, gridtype)
+        if !isnothing(C𝑗N)
+			𝑗N = Lwet3D[C𝑗N]
+			if !ismissing(𝑗N) && ΩH[𝑗N]
+				# (𝑖 == 𝑗N) && @show(i, j, iN, jN)
+				iN, jN, _ = C𝑗N.I
+				# Note that the opposite direction (oppdir) is still north at j == ny
+				# TODO: implement this into a topology.jl function
+				oppdir = (j == ny) ? :north : :south
+				aij = verticalfacearea(edge_length_2D, DZT3d, i, j, k, :north)
+				aji = verticalfacearea(edge_length_2D, DZT3d, iN, jN, k, oppdir)
+				a = min(aij, aji)
+				dij = horizontalcentroiddistance(distance_to_edge_2D, i, j, iN, jN, :north)
+				dji = horizontalcentroiddistance(distance_to_edge_2D, iN, jN, i, j, oppdir)
+				d = (dij + dji) / 2
+				pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗N, κH, a, d, V)
+			end
         end
 	end
 
@@ -378,7 +385,7 @@ end
 function vertical_diffusion_operator_sparse_entries(; modelgrid, indices, κV, Ω)
 
     # Unpack model grid
-    (; v3D, area2D, zt) = modelgrid
+    (; v3D, area2D, zt, gridtype) = modelgrid
     # Unpack indices
     (; wet3D, Lwet, Lwet3D, C) = indices
 
@@ -388,28 +395,31 @@ function vertical_diffusion_operator_sparse_entries(; modelgrid, indices, κV, �
 
     @time for 𝑖 in eachindex(Lwet)
         Ω[𝑖] || continue # only continue if inside Ω
-		Li = Lwet[𝑖]
-		i, j, k = C[Li].I
-		V = v3D[i,j,k]
+		L𝑖 = Lwet[𝑖]
+		C𝑖 = C[L𝑖]
+		i, j, k = C𝑖.I
+		V = v3D[C𝑖]
         a = area2D[i,j]
 		# From Bottom
-        if k < nz
-            k′ = k + 1
-            𝑗B = Lwet3D[i,j,k′]
-            if !ismissing(𝑗B) && Ω[𝑗B] # only continue if inside Ω
-                d = abs(zt[k] - zt[k′])
-                pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗B, κV, a, d, V)
-            end
-        end
+		C𝑗B = k₊₁(C𝑖, gridtype)
+		if !isnothing(C𝑗B)
+			𝑗B = Lwet3D[C𝑗B]
+			if !ismissing(𝑗B) && Ω[𝑗B] # only continue if inside Ω
+				_, _, k′ = C𝑗B.I
+				d = abs(zt[k] - zt[k′])
+				pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗B, κV, a, d, V)
+			end
+		end
 		# From Top
-        if k > 1
-            k′ = k - 1
-            𝑗T = Lwet3D[i,j,k′]
-            if !ismissing(𝑗T) && Ω[𝑗T] # only continue if inside Ω
-                d = abs(zt[k] - zt[k′])
-                pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗T, κV, a, d, V)
-            end
-        end
+		C𝑗T = k₋₁(C𝑖, gridtype)
+		if !isnothing(C𝑗T)
+			𝑗T = Lwet3D[C𝑗T]
+			if !ismissing(𝑗T) && Ω[𝑗T] # only continue if inside Ω
+				_, _, k′ = C𝑗T.I
+				d = abs(zt[k] - zt[k′])
+				pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗T, κV, a, d, V)
+			end
+		end
 	end
 	return 𝑖s, 𝑗s, Tvals
 end

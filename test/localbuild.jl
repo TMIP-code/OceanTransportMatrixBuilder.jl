@@ -491,23 +491,56 @@ end
 
 
 
-        # plot lon lat grid
+        # plot lon lat grid edges
         fig = Figure(size=(2000, 1000))
-
-        loncut = (lon[1,1] + lon[end,1]) / 2
-        lon = mod.(lon .- loncut, 360) .+ loncut
-
+        loncut = lon_vertices[1,1,1]
+        # TODO: this is currently not working for plotting cells that wrap around the dateline
+        # It's OK for longitudes to be in the same window for checking connections,
+        # but it would be good to implement a simple function to fix that for plotting.
+        lon_edges = [
+            lon_vertices[1,:,:] lon_vertices[4,:,end]
+            lon_vertices[2,end,:]' lon_vertices[3,end,end]
+        ]
+        lon_edges[1:end-1,:] .= mod.(lon_edges[1:end-1,:] .- loncut, 360) .+ loncut
+        lon_edges[end,:] .= mod1.(lon_edges[end,:] .- loncut, 360) .+ loncut
+        lat_edges = [
+            lat_vertices[1,:,:] lat_vertices[4,:,end]
+            lat_vertices[2,end,:]' lat_vertices[3,end,end]
+        ]
         ax = Axis(fig[1,1], xlabel = "longitude (°)", ylabel = "latitude (°)")
-        lonnorthsouth = reduce(vcat, [[col; NaN] for col in eachcol(lon)])
+        lonnorthsouth = reduce(vcat, [[col; NaN] for col in eachcol(lon_edges)])
+        latnorthsouth = reduce(vcat, [[col; NaN] for col in eachcol(lat_edges)])
+        loneastwest = reduce(vcat, [[row; NaN] for row in eachrow(lon_edges)])
+        lateastwest = reduce(vcat, [[row; NaN] for row in eachrow(lat_edges)])
+        lines!(ax, [lonnorthsouth; NaN; loneastwest], [latnorthsouth; NaN; lateastwest], linewidth = 0.5)
+        # Add boarders
+        lines!(ax, lon_edges[1,:], lat_edges[1,:], linewidth = 2, color=:black)
+        lines!(ax, lon_edges[end,:], lat_edges[end,:], linewidth = 2, color=:red)
+        lines!(ax, lon_edges[:,1], lat_edges[:,1], linewidth = 2, color=:black)
+        lines!(ax, lon_edges[:,end], lat_edges[:,end], linewidth = 2, color=:green)
+        Label(fig[0,1], text = "Grid cell edges check $model model", tellwidth = false, fontsize = 20)
+        ylims!(ax, (50, 91))
+        fig
+        outputfile = joinpath(outputdir, "grid_cell_edges_check_local_$model.png")
+        @info "Saving lon/lat check as image file:\n  $(outputfile)"
+        save(outputfile, fig)
+
+
+
+        # plot lon lat grid centers
+        fig = Figure(size=(2000, 1000))
+        loncut = (lon[1,1] + lon[end,1]) / 2
+        lon2 = mod.(lon .- loncut, 360) .+ loncut
+        ax = Axis(fig[1,1], xlabel = "longitude (°)", ylabel = "latitude (°)")
+        lonnorthsouth = reduce(vcat, [[col; NaN] for col in eachcol(lon2)])
         latnorthsouth = reduce(vcat, [[col; NaN] for col in eachcol(lat)])
         lines!(ax, lonnorthsouth, latnorthsouth, linewidth = 0.5)
-        loneastwest = reduce(vcat, [[row; NaN] for row in eachrow(lon)])
+        loneastwest = reduce(vcat, [[row; NaN] for row in eachrow(lon2)])
         lateastwest = reduce(vcat, [[row; NaN] for row in eachrow(lat)])
         lines!(ax, loneastwest, lateastwest, linewidth = 0.5)
-
-        Label(fig[0,1], text = "Longitude/latitude grid check $model model", tellwidth = false, fontsize = 20)
+        Label(fig[0,1], text = "Grid cell centers check $model model", tellwidth = false, fontsize = 20)
         fig
-        outputfile = joinpath(outputdir, "lonlat_check_local_$model.png")
+        outputfile = joinpath(outputdir, "grid_cell_centers_check_local_$model.png")
         @info "Saving lon/lat check as image file:\n  $(outputfile)"
         save(outputfile, fig)
 

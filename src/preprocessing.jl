@@ -159,7 +159,9 @@ function makemodelgrid(; areacello, volcello, lon, lat, lev, lon_vertices, lat_v
     edge_length_2D = Dict(d=>[verticalfacewidth(lon_vertices, lat_vertices, 𝑖.I[1], 𝑖.I[2], d) for 𝑖 in C] for d in dirs)
     distance_to_edge_2D = Dict(d=>[centroid2edgedistance(lon, lat, lon_vertices, lat_vertices, 𝑖.I[1], 𝑖.I[2], d) for 𝑖 in C] for d in dirs)
 
-	return (; area2D, v3D, DZT3d, lon_vertices, lat_vertices, lon, lat, zt, edge_length_2D, distance_to_edge_2D)
+    gridtype = gridtopology(lon_vertices, lat_vertices, zt)
+
+	return (; area2D, v3D, DZT3d, lon_vertices, lat_vertices, lon, lat, zt, edge_length_2D, distance_to_edge_2D, gridtype)
 end
 
 function makeindices(v3D)
@@ -190,34 +192,6 @@ end
 #           │
 #     1 ────┘ 2
 #
-# Given lon_vertices and lat_vertices, find the permutation
-# that sorts the vertices in that order.
-function vertexpermutation(lon_vertices, lat_vertices)
-    # Make sure the vertices are in the right shape (4, nx, ny)
-    @assert size(lon_vertices, 1) == size(lat_vertices, 1) == 4
-    # Take the first grid cell
-    i = j = 1
-    # Turn the vertices into points
-    points = collect(zip(lon_vertices[:, i, j], lat_vertices[:, i, j]))
-    points_east = collect(zip(lon_vertices[:, i+1, j], lat_vertices[:, i+1, j]))
-    points_north = collect(zip(lon_vertices[:, i, j+1], lat_vertices[:, i, j+1]))
-    # Find the common points
-    common_east = intersect(Set(points), Set(points_east))
-    common_noth = intersect(Set(points), Set(points_north))
-    # Find the indices of the common points
-    idx_east = findall(in(common_east), points)
-    idx_north = findall(in(common_noth), points)
-    idx3 = only(intersect(idx_east, idx_north)) # common to all 3 cells
-    idx2 = only(setdiff(idx_east, idx3)) # common to (i,j) and (i+1,j) only
-    idx4 = only(setdiff(idx_north, idx3)) # common to (i,j) and (i,j+1) only
-    idx1 = only(setdiff(1:4, idx2, idx3, idx4)) # only in (i,j)
-    return [idx1, idx2, idx3, idx4]
-end
-
-# View form top for vlon and vlat vertices
-#    4 ────┐ 3
-#          │
-#    1 ────┘ 2
 function vertexindices(dir)
     dir == :south ? (1, 2) :
     dir == :east ? (2, 3) :
