@@ -70,8 +70,6 @@
     modelgrid = makemodelgrid(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
     (; lon_vertices, lat_vertices) = modelgrid
 
-
-
     # Make fuxes from all directions
     ϕ = facefluxesfrommasstransport(; umo, vmo)
 
@@ -122,6 +120,10 @@
         @test Ttest isa SparseMatrixCSC{Float64, Int}
     end
 
+    @show version = "v$(pkgversion(OceanTransportMatrixBuilder))"
+    outputdir = joinpath("plots", version)
+    mkpath(outputdir)
+
 end
 
 
@@ -159,15 +161,13 @@ end
         lon = readcubedata(volcello_ds.lon)
         lat = readcubedata(volcello_ds.lat)
         lev = volcello_ds.lev
-        if model ∈ ("ACCESS-ESM1-5", "ACCESS-CM2")
-            lon_vertices = readcubedata(volcello_ds.lon_verticies) # xmip issue: https://github.com/jbusecke/xMIP/issues/369
-            lat_vertices = readcubedata(volcello_ds.lat_verticies) # xmip issue: https://github.com/jbusecke/xMIP/issues/369
-        elseif model ∈ ("ACCESS1-3", "ACCESS1-0")
-            lon_vertices = readcubedata(volcello_ds.lon_vertices) # no xmip so default key
-            lat_vertices = readcubedata(volcello_ds.lat_vertices) # no xmip so default key
-        else
-            error("Need to hardcode the lon_vertices and lat_vertices keys for $model in the tests")
-        end
+        # Identify the vertices keys (vary across CMIPs / models)
+        volcello_keys = propertynames(volcello_ds)
+        lon_vertices_key = volcello_keys[findfirst(x -> occursin("lon", x) & occursin("vert", x), string.(volcello_keys))]
+        lat_vertices_key = volcello_keys[findfirst(x -> occursin("lat", x) & occursin("vert", x), string.(volcello_keys))]
+        lon_vertices = readcubedata(getproperty(volcello_ds, lon_vertices_key))
+        lat_vertices = readcubedata(getproperty(volcello_ds, lat_vertices_key))
+
 
         # Make makemodelgrid
         modelgrids[model] = makemodelgrid(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
@@ -176,6 +176,10 @@ end
         indicess[model] = makeindices(modelgrids[model].v3D)
 
     end
+
+    @show version = "v$(pkgversion(OceanTransportMatrixBuilder))"
+    outputdir = joinpath("plots", version)
+    mkpath(outputdir)
 
 end
 
@@ -270,6 +274,7 @@ end
     using GLMakie
     using Makie.StructArrays
 
+    outputdir = LocalBuiltMatrix.outputdir
     (; ϕ, ϕ_bis) = LocalBuiltMatrix
     (; wet3D) = LocalBuiltMatrix.indices
 
@@ -307,7 +312,7 @@ end
     end
     Label(fig[-1,:], text = "Cell area fluxes from mass transport vs velocities", tellwidth = false, fontsize = 20)
     fig
-    outputfile = "plots/cell_face_fluxes_check_local_ACCESS-ESM1-5.png"
+    outputfile = joinpath(outputdir, "cell_face_fluxes_check_local_ACCESS-ESM1-5.png")
     @info "Saving cell face fluxes check as image file:\n $(joinpath("test", outputfile))"
     save(outputfile, fig)
 
@@ -363,9 +368,9 @@ end
         Δcb.width = Relative(1)
 
         Label(fig[0,:], text = "ϕ_bis - ϕ (k=$k)", tellwidth = false, fontsize = 20)
-        outputdir = "plots/fluxes_from_velocity"
-        mkpath(outputdir)
-        local outputfile = joinpath(outputdir, "k=$(k)_check_local_ACCESS-ESM1-5.png")
+        outputdir2 = joinpath(outputdir, "fluxes_from_velocity")
+        mkpath(outputdir2)
+        local outputfile = joinpath(outputdir2, "k=$(k)_check_local_ACCESS-ESM1-5.png")
         @info "Saving fluxes comparison k=$k check as image file:\n $(joinpath("test", outputfile))"
         save(outputfile, fig)
     end
@@ -378,6 +383,8 @@ end
     using GLMakie
     using Unitful
     using Unitful: m, km
+
+    outputdir = BuiltACCESSModelGrids.outputdir
 
     function customdecorations!(ax; i = 1, j = 1, imax = 1)
         hidexdecorations!(ax,
@@ -447,7 +454,7 @@ end
         cb = Colorbar(fig[1:2,5]; limits=colorrange, label="km")
         cb.height = Relative(0.8)
         fig
-        outputfile = "plots/distances_check_$model.png"
+        outputfile = joinpath(outputdir, "distances_check_$model.png")
         @info "Saving distances check as image file:\n  $(outputfile)"
         save(outputfile, fig)
 
@@ -468,7 +475,7 @@ end
         end
         Label(fig[0,1], text = "Vertices check $model model", tellwidth = false, fontsize = 20)
         fig
-        outputfile = "plots/vertices_check_local_$model.png"
+        outputfile = joinpath(outputdir, "vertices_check_local_$model.png")
         @info "Saving vertices check as image file:\n  $(outputfile)"
         save(outputfile, fig)
 
@@ -500,7 +507,7 @@ end
 
         Label(fig[0,1], text = "Longitude/latitude grid check $model model", tellwidth = false, fontsize = 20)
         fig
-        outputfile = "plots/lonlat_check_local_$model.png"
+        outputfile = joinpath(outputdir, "lonlat_check_local_$model.png")
         @info "Saving lon/lat check as image file:\n  $(outputfile)"
         save(outputfile, fig)
 
@@ -513,7 +520,7 @@ end
         cb = Colorbar(fig[1,2], cf; label = km2)
         Label(fig[0,1], text = "Area grid check $model model", tellwidth = false, fontsize = 20)
         fig
-        outputfile = "plots/area_check_local_$model.png"
+        outputfile = joinpath(outputdir, "area_check_local_$model.png")
         @info "Saving area check as image file:\n  $(outputfile)"
         save(outputfile, fig)
 
@@ -537,7 +544,7 @@ end
         cb.height = Relative(0.666)
         Label(fig[0,1:2], text = "Volume grid check $model model", tellwidth = false, fontsize = 20)
         fig
-        outputfile = "plots/volume_check_local_$model.png"
+        outputfile = joinpath(outputdir, "volume_check_local_$model.png")
         @info "Saving volume check as image file:\n  $(outputfile)"
         save(outputfile, fig)
 
@@ -560,7 +567,7 @@ end
         cb.height = Relative(0.666)
         Label(fig[0,1:2], text = "Cell thickness grid check $model model", tellwidth = false, fontsize = 20)
         fig
-        outputfile = "plots/cell_thickness_check_local_$model.png"
+        outputfile = joinpath(outputdir, "cell_thickness_check_local_$model.png")
         @info "Saving cell thickness check as image file:\n  $(outputfile)"
         save(outputfile, fig)
 
@@ -575,7 +582,7 @@ end
         scatter!(ax, X, Y, markersize = 0.5)
         ax = Axis(fig[1,2], xlabel = rich("$model0 cell volumes (", km3, ")"), ylabel = "relative error (%)")
         scatter!(ax, X, 100 * abs.(Y .- X) ./ X, markersize = 0.5)
-        outputfile = "plots/volume_comparison_$(model0)_vs_$(model).png"
+        outputfile = joinpath(outputdir, "volume_comparison_$(model0)_vs_$(model).png")
         @info "Saving volume comparison as image file:\n  $(outputfile)"
         save(outputfile, fig)
 
@@ -593,7 +600,7 @@ end
         cb.height = Relative(0.666)
         Label(fig[0,1], text = "$model mixed-layer depth", tellwidth = false, fontsize = 20)
         fig
-        outputfile = "plots/MLD_check_local_$model.png"
+        outputfile = joinpath(outputdir, "MLD_check_local_$model.png")
         @info "Saving MLD check as image file:\n  $(outputfile)"
         save(outputfile, fig)
 

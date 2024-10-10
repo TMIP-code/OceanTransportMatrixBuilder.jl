@@ -48,10 +48,10 @@ function facefluxesfrommasstransport(; umo, vmo)
 end
 
 """
-    facefluxesfromvelocities(; uo, vo, modelgrid, ρ)
+    facefluxesfromvelocities(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, ρ)
 
 Return the fluxes integrated over each cell face (east, west, north, south, top, bottom)
-given either `uo`, `vo`, `modelgrid`, and `ρ`.
+given either `uo`, `vo`, their lon/alt locations, and `modelgrid` and `ρ`.
 
 See also `facefluxes`.
 """
