@@ -1,3 +1,35 @@
+# The default orientation is the following:
+#
+#     4 ────┐ 3
+#           │
+#     1 ────┘ 2
+#
+# Given lon_vertices and lat_vertices, find the permutation
+# that sorts the vertices in that order.
+function vertexpermutation(lon_vertices, lat_vertices)
+    # Make sure the vertices are in the right shape (4, nx, ny)
+    @assert size(lon_vertices, 1) == size(lat_vertices, 1) == 4
+    # Take the first grid cell
+    i = j = 1
+    # Turn the vertices into points
+    points = collect(zip(lon_vertices[:, i, j], lat_vertices[:, i, j]))
+    points_east = collect(zip(lon_vertices[:, i+1, j], lat_vertices[:, i+1, j]))
+    points_north = collect(zip(lon_vertices[:, i, j+1], lat_vertices[:, i, j+1]))
+    # Find the common points
+    common_east = Set(points) ∩ Set(points_east)
+    common_noth = Set(points) ∩ Set(points_north)
+    # Find the indices of the common points
+    idx_east = findall(in(common_east), points)
+    idx_north = findall(in(common_noth), points)
+    idx3 = only(idx_east ∩ idx_north) # common to all 3 cells
+    idx2 = only(setdiff(idx_east, idx3)) # common to (i,j) and (i+1,j) only
+    idx4 = only(setdiff(idx_north, idx3)) # common to (i,j) and (i,j+1) only
+    idx1 = only(setdiff(1:4, idx2, idx3, idx4)) # only in (i,j)
+    return [idx1, idx2, idx3, idx4]
+end
+
+
+
 """
     arakawa, uo_pos, vo_pos, uo_relerr, vo_relerr = gridtype(uo_lon, uo_lat, vo_lon, vo_lat, modelgrid)
 
@@ -115,3 +147,4 @@ function interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, mod
     end
 
 end
+
