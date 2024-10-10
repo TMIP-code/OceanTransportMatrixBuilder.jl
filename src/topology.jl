@@ -15,6 +15,11 @@ struct UnknownGrid <: AbstractGrid
     nz::Int64
 end
 
+"""
+    gridtopology(lon_vertices, lat_vertices, lev)
+
+Returns the type of grid based on how the vertices connect at the north pole.
+"""
 function gridtopology(lon_vertices, lat_vertices, lev)
     nx = size(lon_vertices, 2)
     ny = size(lon_vertices, 3)
@@ -22,7 +27,7 @@ function gridtopology(lon_vertices, lat_vertices, lev)
     # North pole vertices
     NPlon = @view lon_vertices[3:4,:,end]
     NPlat = @view lat_vertices[3:4,:,end]
-    # If all the latitudes of the "northest" vertices are 90, then it's a "regular" grid with 2 poles
+    # If all the latitudes of the "northmost" vertices are 90, then it's a "regular" grid with 2 poles
     if all(NPlat .== 90)
         return BipolarGrid(nx,ny,nz)
     # Otherwise check if the north pole is split in two
@@ -45,7 +50,13 @@ k₊₁(C, g::AbstractGrid) = C.I[3] < g.nz ? C + CartesianIndex(0, 0, 1) : noth
 k₋₁(C, ::AbstractGrid) = C.I[3] > 1 ? C + CartesianIndex(0, 0, -1) : nothing
 
 # Special behavior for tripolar grids where the seam connects the top and "folds" it around
-j₊₁(C, g::TripolarGrid) = C.I[2] < g.ny ? C + CartesianIndex(0, 1, 0) : CartesianIndex(mod1(g.nx - C.I[1] + 1, g.nx), g.ny, C.I[3])
+# ┌─────┬─────┬─────┬─────┬─────┬─────┐
+# │  6  │  5  │  4  │  3  │  2  │  1  │
+# ├─────┼─────┼─────┼─────┼─────┼─────┤ ◄─ seam
+# │  1  │  2  │  3  │  4  │  5  │  6  │
+# └─────┴─────┴─────┴─────┴─────┴─────┘
+#            ─► increasing i ("east")
+j₊₁(C, g::TripolarGrid) = C.I[2] < g.ny ? C + CartesianIndex(0, 1, 0) : CartesianIndex(g.nx - C.I[1] + 1, g.ny, C.I[3])
 
 # error for unknown grids
 i₊₁(C, ::UnknownGrid) = error("Unknown grid type")

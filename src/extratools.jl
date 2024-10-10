@@ -16,7 +16,7 @@ The di, dj, and dk options (default di = dj = 2 and dk = 1)
 set the size of the coarsening.
 Let me explain with an example:
 
-    lump_and_spray(grd, di=3, dj=4)
+    lump_and_spray(wet3D, volume; di=3, dj=4)
 
 will lump:
 - every 3 cells in the x direction (lon),
@@ -29,7 +29,7 @@ lat × lon × depth.
 You can also provide a vector of indices instead of a scalar
 in order to customize the coarsening. For example,
 
-    lump_and_spray(grd, di=[1 1 1 1 1 1 1 2 2 2 ... n])
+    lump_and_spray(wet3D, volume; di=[1 1 1 1 1 1 1 2 2 2 ... n])
 
 will lump all the boxes in the x dimension that are marked
 with a 1, then all those marked with a 2, and so on.
@@ -42,7 +42,9 @@ The you can do
 to get the OCIM2 z-indices that are closest to the
 ACCESS z-indices. And then you can pass it to this function via
 
-    lump_and_spray(grd, dk=zidx)
+    lump_and_spray(wet3D, volume; dk=zidx)
+
+TODO: Fix these docs that have not been fully translated from MATLAB version.
 """
 lump_and_spray(wet3D, volume; di=2, dj=2, dk=1) = _lump_and_spray(wet3D, volume, di, dj, dk)
 function _lump_and_spray(wet3D, volume, di::Int, dj::Int, dk::Int)
@@ -125,46 +127,12 @@ end
 
 
 
-function areafun3D(vlon, vlat, vlev_bnds_or_thkcello, C, Lwet, dir)
-    area1D = [verticalfacearea(vlon, vlat, vlev_bnds_or_thkcello, I.I[1], I.I[2], I.I[3], dir) for I in C[Lwet]]
-    area3D = fill(NaN, size(C))
-    area3D[Lwet] .= area1D
-    return area3D
-end
 
 
 
 
 
 
-
-
-
-# Figuring out the "topology" of the grid
-# Right now I think I can only use standard grids or tripolar grids.
-function gridtopology(volumedata)
-    !haskey(volumedata, "vertices_longitude")
-    if !haskey(volumedata, "vertices_longitude") ||
-        !haskey(volumedata, "vertices_latitude")
-        return nothing
-    end
-
-    vlonnorth = volumedata["vertices_longitude"][:,:,end]
-    vlatnorth = volumedata["vertices_latitude"][:,:,end]
-
-    # The longitude of the two north poles
-    lonpoles = unique(vlonnorth[end,:])
-    length(lonpoles) ≠ 2 && return nothing
-
-    # The i index (lon) of the box[i,end] that connects with box[1,end]
-    NEpoints = collect(zip(vlonnorth[3,:,end], vlatnorth[3,:,end]))
-    NWpoints = collect(zip(vlonnorth[4,:,end], vlatnorth[4,:,end]))
-    ilon1 = only(findall(([NEpoints[1]] .== NWpoints) .& ([NWpoints[1]] .== NEpoints)))
-    nx = length(NEpoints)
-
-    return i -> mod1(ilon1 - i + 1, nx)
-
-end
 
 
 

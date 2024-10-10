@@ -1,11 +1,19 @@
-# The default orientation is the following:
-#
-#     4 ────┐ 3
-#           │
-#     1 ────┘ 2
-#
-# Given lon_vertices and lat_vertices, find the permutation
-# that sorts the vertices in that order.
+
+"""
+    vertexpermutation(lon_vertices, lat_vertices)
+
+Returns the permutation that sorts the vertices in the default orientation,
+where the default orientation is the following:
+
+```
+    4 ────────┐ 3
+              │   ▲
+              │   │ j ("North")
+              │
+    1 ────────┘ 2
+    ─► i ("East")
+```
+"""
 function vertexpermutation(lon_vertices, lat_vertices)
     # Make sure the vertices are in the right shape (4, nx, ny)
     @assert size(lon_vertices, 1) == size(lat_vertices, 1) == 4
@@ -107,6 +115,12 @@ function gridtype(uo_lon, uo_lat, vo_lon, vo_lat, modelgrid)
 
 end
 
+"""
+    uo, uo_lon, uo_lat, vo, vo_lon, vo_lat = interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid)
+
+Interpolates the velocity fields `uo` and `vo` from B- or C-grid
+onto the default C-grid (centered on the cell faces).
+"""
 function interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid)
 
     _FillValue = uo.properties["_FillValue"]
