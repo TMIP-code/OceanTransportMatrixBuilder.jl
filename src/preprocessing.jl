@@ -134,7 +134,7 @@ function makemodelgrid(; areacello, volcello, lon, lat, lev, lon_vertices, lat_v
 
     # area (2D)
     FillValue = areacello.properties["_FillValue"]
-    area2D = areacello |> Array{Float64}
+    area2D = areacello |> Array{Union{Missing, Float64}}
     area2D = replace(area2D, missing => NaN, 0 => NaN, FillValue => NaN)
 
 	# depth and cell height (3D)
