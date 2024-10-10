@@ -13,7 +13,9 @@
     using LinearAlgebra
 
     # My local directory for input files
-    inputdir = "/Users/benoitpasquier/Data/TMIP/data/ACCESS-ESM1-5/historical/r1i1p1f1/Jan1990-Dec1999"
+    model = "ACCESS-ESM1-5"
+    member = "r1i1p1f1"
+    inputdir = "/Users/benoitpasquier/Data/TMIP/data/$model/historical/$member/Jan1990-Dec1999"
 
     # Load datasets
     umo_ds = open_dataset(joinpath(inputdir, "umo.nc"))
@@ -232,20 +234,20 @@ end
     using LinearAlgebra
     using Unitful
     using Unitful: s, yr
+    using NaNStatistics
+    using GLMakie
 
+    (; modelgrid, indices, T, model, member, outputdir) = LocalBuiltMatrix
 
     # unpack model grid
-    (; v3D,) = LocalBuiltMatrix.modelgrid
+    (; v3D, lat, zt) = modelgrid
     # unpack indices
-    (; wet3D, N) = LocalBuiltMatrix.indices
+    (; wet3D, N) = indices
 
     v = v3D[wet3D]
 
     @info "coarsening grid"
     LUMP, SPRAY, wet3D_c, v_c = OceanTransportMatrixBuilder.lump_and_spray(wet3D, v; di=2, dj=2, dk=1)
-
-    # unpack transport matrices
-    (; T) = LocalBuiltMatrix
 
     # surface mask
     issrf3D = copy(wet3D)
@@ -264,7 +266,22 @@ end
     Γ = SPRAY * Γ_c
     Γyr = ustrip.(yr, Γ .* s)
     Γ3D = OceanTransportMatrixBuilder.as3D(Γyr, wet3D)
-
+    begin # plot zonal average
+        Γ2D = dropdims(nansum(Γ3D .* v3D, dims = 1) ./ nansum(v3D, dims = 1), dims = 1)
+        fig = Figure()
+        ax = Axis(fig[1,1], xlabel = "latitude (°)", ylabel = "depth (m)")
+        levels = 0:100:2000
+        colormap = :viridis
+        co = contourf!(ax, dropdims(maximum(lat |> Array, dims=1), dims=1), zt |> Array, Γ2D; levels, colormap)
+        cb = Colorbar(fig[1, 2], co; label = "Ideal mean age (yr)", tellheight = false)
+        cb.height = Relative(2/3)
+        ylims!(ax, (6000, 0))
+        Label(fig[0,1], text = "$model $member ideal mean age", tellwidth = false)
+        fig
+    end
+    outputfile = joinpath(outputdir, "ideal_age_$model.png")
+    @info "Saving ideal age as image file:\n $(joinpath("test", outputfile))"
+    save(outputfile, fig)
     @test 0 < (v' * Γyr) / sum(v) < 2000
 
 end
@@ -455,7 +472,7 @@ end
         cb.height = Relative(0.8)
         fig
         outputfile = joinpath(outputdir, "distances_check_$model.png")
-        @info "Saving distances check as image file:\n  $(outputfile)"
+        @info "Saving distances check as image file:\n  $(joinpath("test", outputfile))"
         save(outputfile, fig)
 
 
@@ -476,7 +493,7 @@ end
         Label(fig[0,1], text = "Vertices check $model model", tellwidth = false, fontsize = 20)
         fig
         outputfile = joinpath(outputdir, "vertices_check_local_$model.png")
-        @info "Saving vertices check as image file:\n  $(outputfile)"
+        @info "Saving vertices check as image file:\n  $(joinpath("test", outputfile))"
         save(outputfile, fig)
 
         # Check that the correct vertex order was applied to all cells
@@ -508,7 +525,7 @@ end
         Label(fig[0,1], text = "Longitude/latitude grid check $model model", tellwidth = false, fontsize = 20)
         fig
         outputfile = joinpath(outputdir, "lonlat_check_local_$model.png")
-        @info "Saving lon/lat check as image file:\n  $(outputfile)"
+        @info "Saving lon/lat check as image file:\n  $(joinpath("test", outputfile))"
         save(outputfile, fig)
 
 
@@ -521,7 +538,7 @@ end
         Label(fig[0,1], text = "Area grid check $model model", tellwidth = false, fontsize = 20)
         fig
         outputfile = joinpath(outputdir, "area_check_local_$model.png")
-        @info "Saving area check as image file:\n  $(outputfile)"
+        @info "Saving area check as image file:\n  $(joinpath("test", outputfile))"
         save(outputfile, fig)
 
 
@@ -545,7 +562,7 @@ end
         Label(fig[0,1:2], text = "Volume grid check $model model", tellwidth = false, fontsize = 20)
         fig
         outputfile = joinpath(outputdir, "volume_check_local_$model.png")
-        @info "Saving volume check as image file:\n  $(outputfile)"
+        @info "Saving volume check as image file:\n  $(joinpath("test", outputfile))"
         save(outputfile, fig)
 
 
@@ -568,7 +585,7 @@ end
         Label(fig[0,1:2], text = "Cell thickness grid check $model model", tellwidth = false, fontsize = 20)
         fig
         outputfile = joinpath(outputdir, "cell_thickness_check_local_$model.png")
-        @info "Saving cell thickness check as image file:\n  $(outputfile)"
+        @info "Saving cell thickness check as image file:\n  $(joinpath("test", outputfile))"
         save(outputfile, fig)
 
 
@@ -583,7 +600,7 @@ end
         ax = Axis(fig[1,2], xlabel = rich("$model0 cell volumes (", km3, ")"), ylabel = "relative error (%)")
         scatter!(ax, X, 100 * abs.(Y .- X) ./ X, markersize = 0.5)
         outputfile = joinpath(outputdir, "volume_comparison_$(model0)_vs_$(model).png")
-        @info "Saving volume comparison as image file:\n  $(outputfile)"
+        @info "Saving volume comparison as image file:\n  $(joinpath("test", outputfile))"
         save(outputfile, fig)
 
 
@@ -601,7 +618,7 @@ end
         Label(fig[0,1], text = "$model mixed-layer depth", tellwidth = false, fontsize = 20)
         fig
         outputfile = joinpath(outputdir, "MLD_check_local_$model.png")
-        @info "Saving MLD check as image file:\n  $(outputfile)"
+        @info "Saving MLD check as image file:\n  $(joinpath("test", outputfile))"
         save(outputfile, fig)
 
     end
