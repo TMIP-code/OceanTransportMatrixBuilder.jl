@@ -19,13 +19,15 @@ function vertexpermutation(lon_vertices, lat_vertices)
     @assert size(lon_vertices, 1) == size(lat_vertices, 1) == 4
     # Take the first grid cell
     i = j = 1
+
     # Turn the vertices into points
     points = collect(zip(lon_vertices[:, i, j], lat_vertices[:, i, j]))
     points_east = collect(zip(lon_vertices[:, i+1, j], lat_vertices[:, i+1, j]))
     points_north = collect(zip(lon_vertices[:, i, j+1], lat_vertices[:, i, j+1]))
+    println()
     # Find the common points
-    common_east = Set(points) ∩ Set(points_east)
-    common_noth = Set(points) ∩ Set(points_north)
+    common_east = approxlonlatintersectleft(points, points_east)
+    common_noth = approxlonlatintersectleft(points, points_north)
     # Find the indices of the common points
     idx_east = findall(in(common_east), points)
     idx_north = findall(in(common_noth), points)
@@ -35,6 +37,18 @@ function vertexpermutation(lon_vertices, lat_vertices)
     idx1 = only(setdiff(1:4, idx2, idx3, idx4)) # only in (i,j)
     return [idx1, idx2, idx3, idx4]
 end
+
+
+# Helper functions for approximate comparisons and intersections
+isapproxangle(α, β; atol=1e-2) = abs(mod(α - β + 180, 360) - 180) < atol
+function isapproxpoint(A, B; atol=1e-2)
+    lonA, latA = A
+    lonB, latB = B
+    return isapproxangle(lonA, lonB; atol) && isapproxangle(latA, latB; atol)
+end
+approxlonlatintersectleft(As, Bs; atol=1e-2) = [A for A in As if any(isapproxpoint(A, B; atol) for B in Bs)]
+
+
 
 
 
