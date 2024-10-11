@@ -296,7 +296,7 @@ function horizontal_diffusion_operator_sparse_entries(; modelgrid, indices, κH,
 				aji = verticalfacearea(edge_length_2D, DZT3d, iW, jW, k, :east)
 				a = min(aij, aji)
 				# I take the mean distance from both dirs
-				d = horizontalcentroiddistance2(lon, lat, i, j, iW, jW)
+				d = horizontalcentroiddistance(lon, lat, i, j, iW, jW)
 				pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗W, κH, a, d, V)
 			end
 		end
@@ -310,7 +310,7 @@ function horizontal_diffusion_operator_sparse_entries(; modelgrid, indices, κH,
 				aij = verticalfacearea(edge_length_2D, DZT3d, i, j, k, :east)
 				aji = verticalfacearea(edge_length_2D, DZT3d, iE, jE, k, :west)
 				a = min(aij, aji)
-				d = horizontalcentroiddistance2(lon, lat, i, j, iE, jE)
+				d = horizontalcentroiddistance(lon, lat, i, j, iE, jE)
 				pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗E, κH, a, d, V)
 			end
 		end
@@ -324,7 +324,7 @@ function horizontal_diffusion_operator_sparse_entries(; modelgrid, indices, κH,
 				aij = verticalfacearea(edge_length_2D, DZT3d, i, j, k, :south)
 				aji = verticalfacearea(edge_length_2D, DZT3d, iS, jS, k, :north)
 				a = min(aij, aji)
-				d = horizontalcentroiddistance2(lon, lat, i, j, iS, jS)
+				d = horizontalcentroiddistance(lon, lat, i, j, iS, jS)
 				pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗S, κH, a, d, V)
 			end
 		end
@@ -341,7 +341,7 @@ function horizontal_diffusion_operator_sparse_entries(; modelgrid, indices, κH,
 				aij = verticalfacearea(edge_length_2D, DZT3d, i, j, k, :north)
 				aji = verticalfacearea(edge_length_2D, DZT3d, iN, jN, k, oppdir)
 				a = min(aij, aji)
-				d = horizontalcentroiddistance2(lon, lat, i, j, iN, jN)
+				d = horizontalcentroiddistance(lon, lat, i, j, iN, jN)
 				pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗N, κH, a, d, V)
 			end
         end
