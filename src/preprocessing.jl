@@ -241,21 +241,10 @@ function midpointonsphere(A, B)
 end
 
 
-function horizontalcentroiddistance(distance_to_edge_2D, iA, jA, iB, jB, dir)
-    if dir == :south
-        distance_to_edge_2D[:south][iA, jA] + distance_to_edge_2D[:north][iB, jB]
-    elseif dir == :north
-        if jA == jB # if on North wall, A and B both connect via north
-            distance_to_edge_2D[:north][iA, jA] + distance_to_edge_2D[:north][iB, jB]
-        else
-            distance_to_edge_2D[:north][iA, jA] + distance_to_edge_2D[:south][iB, jB]
-        end
-    elseif dir == :west
-        distance_to_edge_2D[:west][iA, jA] + distance_to_edge_2D[:east][iB, jB]
-    elseif dir == :east
-        distance_to_edge_2D[:east][iA, jA] + distance_to_edge_2D[:west][iB, jB]
-    end
+function horizontalcentroiddistance(lon, lat, iA, jA, iB, jB)
+    A = (lon[iA, jA], lat[iA, jA])
+    B = (lon[iB, jB], lat[iB, jB])
+    return haversine(A, B)
 end
-
 
 
