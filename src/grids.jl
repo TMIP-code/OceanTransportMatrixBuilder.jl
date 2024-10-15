@@ -1,41 +1,15 @@
 
-"""
-    vertexpermutation(lon_vertices, lat_vertices)
 
-Returns the permutation that sorts the vertices in the default orientation,
-where the default orientation is the following:
+abstract type ArakawaGrid end
 
-```
-    4 ────────┐ 3
-              │   ▲
-              │   │ j ("North")
-              │
-    1 ────────┘ 2
-    ─► i ("East")
-```
-"""
-function vertexpermutation(lon_vertices, lat_vertices)
-    # Make sure the vertices are in the right shape (4, nx, ny)
-    @assert size(lon_vertices, 1) == size(lat_vertices, 1) == 4
-    # Take the first grid cell
-    i = j = 1
-    # Turn the vertices into points
-    points = collect(zip(lon_vertices[:, i, j], lat_vertices[:, i, j]))
-    points_east = collect(zip(lon_vertices[:, i+1, j], lat_vertices[:, i+1, j]))
-    points_north = collect(zip(lon_vertices[:, i, j+1], lat_vertices[:, i, j+1]))
-    # Find the common points
-    common_east = Set(points) ∩ Set(points_east)
-    common_noth = Set(points) ∩ Set(points_north)
-    # Find the indices of the common points
-    idx_east = findall(in(common_east), points)
-    idx_north = findall(in(common_noth), points)
-    idx3 = only(idx_east ∩ idx_north) # common to all 3 cells
-    idx2 = only(setdiff(idx_east, idx3)) # common to (i,j) and (i+1,j) only
-    idx4 = only(setdiff(idx_north, idx3)) # common to (i,j) and (i,j+1) only
-    idx1 = only(setdiff(1:4, idx2, idx3, idx4)) # only in (i,j)
-    return [idx1, idx2, idx3, idx4]
+struct AGrid <: ArakawaGrid
 end
 
+struct BGrid <: ArakawaGrid
+end
+
+struct CGrid <: ArakawaGrid
+end
 
 
 """
@@ -98,11 +72,11 @@ function gridtype(uo_lon, uo_lat, vo_lon, vo_lat, modelgrid)
 
     # Arakawa grid type
     if uo_pos == vo_pos == :C
-        arakawa = :A
+        arakawa = AGrid()
     elseif uo_pos == vo_pos && uo_pos ∈ (:NE, :NW, :SE, :SW)
-        arakawa = :B
+        arakawa = BGrid()
     elseif uo_pos ∈ (:E, :W) && vo_pos ∈ (:N, :S)
-        arakawa = :C
+        arakawa = CGrid()
     else
         error("Unknown Arakawa grid type")
     end
@@ -121,7 +95,15 @@ end
 Interpolates the velocity fields `uo` and `vo` from B- or C-grid
 onto the default C-grid (centered on the cell faces).
 """
-function interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid)
+interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid) = interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, gridtype(uo_lon, uo_lat, vo_lon, vo_lat, modelgrid))
+interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, ::CGrid) = uo, uo_lon, uo_lat, vo, vo_lon, vo_lat
+interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, ::AGrid) = error("Interpolation not implemented for this grid type")
+# TODO this is clumsy to have to pass the gridtype but then recompute it
+function interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, arakawa::BGrid)
+
+    arakawa, uo_pos, vo_pos, uo_relerr, vo_relerr = gridtype(uo_lon, uo_lat, vo_lon, vo_lat, modelgrid)
+
+    uo_pos == vo_pos == :NE || error("Interpolation not implemented for this B-grid type")
 
     _FillValue = uo.properties["_FillValue"]
 
@@ -131,34 +113,66 @@ function interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, mod
 
     nx, ny, nz = size(uo)
 
-    arakawa, uo_pos, vo_pos = gridtype(uo_lon, uo_lat, vo_lon, vo_lat, modelgrid)
-
     # unpack modelgrid
     (; lon_vertices, lat_vertices) = modelgrid
 
-    if arakawa == :C && uo_pos == :E && vo_pos == :N
-        return uo, uo_lon, uo_lat, vo, vo_lon, vo_lat
-    elseif arakawa == :B && uo_pos == vo_pos == :NE
-        # It seems that uo/vo is NaN on boundaries (for ACCESS-ESM1-5)
-        # and that umo/vmo were computed as if uo/vo were 0 on boundaries
-        # so that's what we do here
-        uo2 = replace(uo, _FillValue => 0.0)
-        vo2 = replace(vo, _FillValue => 0.0)
-        uo2 = 0.5(uo2 + [fill(0.0, nx, 1, nz);; uo2[:, 1:end-1, :]])
-        vo2 = 0.5(vo2 + [fill(0.0, 1, ny, nz); vo2[1:end-1, :, :]])
-        SE_points = [(lon, lat) for (lon, lat) in zip(lon_vertices[2, :, :], lat_vertices[2, :, :])]
-        NE_points = [(lon, lat) for (lon, lat) in zip(lon_vertices[3, :, :], lat_vertices[3, :, :])]
-        NW_points = [(lon, lat) for (lon, lat) in zip(lon_vertices[4, :, :], lat_vertices[4, :, :])]
-        uo2_points = [midpointonsphere(SE, NE) for (SE, NE) in zip(NE_points, SE_points)]
-        vo2_points = [midpointonsphere(NE, NW) for (NE, NW) in zip(NW_points, NE_points)]
-        uo2_lon = [P[1] for P in uo2_points]
-        uo2_lat = [P[2] for P in uo2_points]
-        vo2_lon = [P[1] for P in vo2_points]
-        vo2_lat = [P[2] for P in vo2_points]
-        return uo2, uo2_lon, uo2_lat, vo2, vo2_lon, vo2_lat
-    else
-        error("Interpolation not implemented for this grid type")
-    end
+    # It seems that uo/vo is NaN on boundaries (for ACCESS-ESM1-5)
+    # and that umo/vmo were computed as if uo/vo were 0 on boundaries
+    # so that's what we do here
+    uo2 = replace(uo, _FillValue => 0.0)
+    vo2 = replace(vo, _FillValue => 0.0)
+    uo2 = 0.5(uo2 + [fill(0.0, nx, 1, nz);; uo2[:, 1:end-1, :]])
+    vo2 = 0.5(vo2 + [fill(0.0, 1, ny, nz); vo2[1:end-1, :, :]])
+    SE_points = [(lon, lat) for (lon, lat) in zip(lon_vertices[2, :, :], lat_vertices[2, :, :])]
+    NE_points = [(lon, lat) for (lon, lat) in zip(lon_vertices[3, :, :], lat_vertices[3, :, :])]
+    NW_points = [(lon, lat) for (lon, lat) in zip(lon_vertices[4, :, :], lat_vertices[4, :, :])]
+    uo2_points = [midpointonsphere(SE, NE) for (SE, NE) in zip(NE_points, SE_points)]
+    vo2_points = [midpointonsphere(NE, NW) for (NE, NW) in zip(NW_points, NE_points)]
+    uo2_lon = [P[1] for P in uo2_points]
+    uo2_lat = [P[2] for P in uo2_points]
+    vo2_lon = [P[1] for P in vo2_points]
+    vo2_lat = [P[2] for P in vo2_points]
+    return uo2, uo2_lon, uo2_lat, vo2, vo2_lon, vo2_lat
 
 end
 
+
+
+
+
+"""
+    vertexpermutation(lon_vertices, lat_vertices)
+
+Returns the permutation that sorts the vertices in the default orientation,
+where the default orientation is the following:
+
+```
+    4 ────────┐ 3
+              │   ▲
+              │   │ j ("North")
+              │
+    1 ────────┘ 2
+    ─► i ("East")
+```
+"""
+function vertexpermutation(lon_vertices, lat_vertices)
+    # Make sure the vertices are in the right shape (4, nx, ny)
+    @assert size(lon_vertices, 1) == size(lat_vertices, 1) == 4
+    # Take the first grid cell
+    i = j = 1
+    # Turn the vertices into points
+    points = collect(zip(lon_vertices[:, i, j], lat_vertices[:, i, j]))
+    points_east = collect(zip(lon_vertices[:, i+1, j], lat_vertices[:, i+1, j]))
+    points_north = collect(zip(lon_vertices[:, i, j+1], lat_vertices[:, i, j+1]))
+    # Find the common points
+    common_east = Set(points) ∩ Set(points_east)
+    common_noth = Set(points) ∩ Set(points_north)
+    # Find the indices of the common points
+    idx_east = findall(in(common_east), points)
+    idx_north = findall(in(common_noth), points)
+    idx3 = only(idx_east ∩ idx_north) # common to all 3 cells
+    idx2 = only(setdiff(idx_east, idx3)) # common to (i,j) and (i+1,j) only
+    idx4 = only(setdiff(idx_north, idx3)) # common to (i,j) and (i,j+1) only
+    idx1 = only(setdiff(1:4, idx2, idx3, idx4)) # only in (i,j)
+    return [idx1, idx2, idx3, idx4]
+end

@@ -7,6 +7,10 @@
     using OceanTransportMatrixBuilder
     using NetCDF
     using YAXArrays
+    using GibbsSeaWater
+    using GLMakie
+    using NaNStatistics
+    using DimensionalData
 
     # stdlib
     using SparseArrays
@@ -16,6 +20,11 @@
     model = "ACCESS-ESM1-5"
     member = "r1i1p1f1"
     inputdir = "/Users/benoitpasquier/Data/TMIP/data/$model/historical/$member/Jan1990-Dec1999"
+
+    # and for output files
+    @show version = "v$(pkgversion(OceanTransportMatrixBuilder))"
+    outputdir = joinpath("plots", version)
+    mkpath(outputdir)
 
     # Load datasets
     umo_ds = open_dataset(joinpath(inputdir, "umo.nc"))
@@ -43,6 +52,10 @@
     lon_vertices = readcubedata(volcello_ds.lon_verticies) # xmip issue: https://github.com/jbusecke/xMIP/issues/369
     lat_vertices = readcubedata(volcello_ds.lat_verticies) # xmip issue: https://github.com/jbusecke/xMIP/issues/369
 
+    # Make makemodelgrid
+    modelgrid = makemodelgrid(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
+    (; lon_vertices, lat_vertices, v3D, zt) = modelgrid
+
     uo = readcubedata(uo_ds.uo)
     vo = readcubedata(vo_ds.vo)
     uo_lon = readcubedata(uo_ds.lon)
@@ -50,18 +63,80 @@
     vo_lon = readcubedata(vo_ds.lon)
     vo_lat = readcubedata(vo_ds.lat)
 
-    # # Load thetato and so to compute density
-    # thetao_ds = open_dataset(joinpath(inputdir, "thetao.nc"))
-    # so_ds = open_dataset(joinpath(inputdir, "so.nc"))
-    # # Load variables in memory
-    # thetao = readcubedata(thetao_ds.thetao)
-    # so = readcubedata(so_ds.so)
-    # # Convert thetao and so to density
-    # ct = gsw_CT_from_pt(so, thetao)
-    # ρθ = gsw_rho(so, ct, 10.1325) # 10.1325 dbar is the reference pressure
+    # Load thetato and so to compute density
+    thetao_ds = open_dataset(joinpath(inputdir, "thetao.nc"))
+    so_ds = open_dataset(joinpath(inputdir, "so.nc"))
+    # Load variables in memory
+    thetao = readcubedata(thetao_ds.thetao)
+    @test 0 < nanmean(thetao) < 20
+    so = readcubedata(so_ds.so)
+    @show 30 < nanmean(so) < 40
+    # Convert thetao and so to density
+    ct = gsw_ct_from_pt.(so, thetao)
+    @show nanmean(ct)
+    ρθ = gsw_rho.(so, ct, 0)
+    @show nanmean(ρθ)
+    # from MATLAB GSW toolbox:
+    # gsw_rho.(so, ct, p)
+    # so = Absolute Salinity (g/kg)
+    # ct = Conservative Temperature (ITS-90) (°C)
+    # p = sea pressure (dbar) (here using 0 pressure to get potential density
+    # TODO: CHECK IF THIS IS CORRECT
+    # plot for sanity check
+    begin # plot zonal average
+        ρθ2D = dropdims(nansum(ρθ .* v3D, dims = 1) ./ nansum(v3D, dims = 1), dims = 1)
+        fig = Figure()
+        ax = Axis(fig[1,1], xlabel = "latitude (°)", ylabel = "depth (m)")
+        # levels = 25:0.1:30
+        colormap = :viridis
+        # co = contourf!(ax, dropdims(maximum(lat |> Array, dims=1), dims=1), zt |> Array, Γ2D; levels, colormap)
+        co = contourf!(ax, dropdims(maximum(lat |> Array, dims=1), dims=1), zt |> Array, ρθ2D; colormap)
+        cb = Colorbar(fig[1, 2], co; label = "Potential density (?)", tellheight = false)
+        cb.height = Relative(2/3)
+        ylims!(ax, (6000, 0))
+        Label(fig[0,1], text = "$model $member Potential density", tellwidth = false)
+        fig
+    end
+    outputfile = joinpath(outputdir, "potential_density_$model.png")
+    @info "Saving ideal age as image file:\n $(joinpath("test", outputfile))"
+    save(outputfile, fig)
+
+    κGM = 600 # m^2/s
+    uGM, vGM = OceanTransportMatrixBuilder.bolus_GM_velocity(ρθ, κGM, modelgrid)
+    # Turn uGM into a YAXArray by rebuilding from uo
+    uGM_YAXArray = rebuild(uo;
+        data = uGM,
+        dims = dims(uo),
+        metadata = Dict(
+            "origin" => "u GM bolus velocity computed from thetao and so",
+            "kGM" => κGM,
+            "units" => "m/s",
+        )
+    )
+    arrays = Dict(:uo_GM => uGM_YAXArray, :lat => uo_lat, :lon => uo_lon)
+    uGM_ds = Dataset(; uo_ds.properties, arrays...)
+    # Save to netCDF file
+    outputfile = joinpath(outputdir, "uo_GM.nc")
+    @info "uo_GM as netCDF file:\n  $(outputfile)"
+    savedataset(uGM_ds, path = outputfile, driver = :netcdf, overwrite = true)
+    # Turn vGM into a YAXArray by rebuilding from uo
+    vGM_YAXArray = rebuild(vo;
+        data = vGM,
+        dims = dims(vo),
+        metadata = Dict(
+            "origin" => "v GM bolus velocity computed from thetao and so",
+            "kGM" => κGM,
+            "units" => "m/s",
+        )
+    )
+    arrays = Dict(:vo_GM => vGM_YAXArray, :lat => vo_lat, :lon => vo_lon)
+    vGM_ds = Dataset(; vo_ds.properties, arrays...)
+    # Save to netCDF file
+    outputfile = joinpath(outputdir, "vo_GM.nc")
+    @info "Saving vo_GM as netCDF file:\n  $(outputfile)"
+    savedataset(vGM_ds, path = outputfile, driver = :netcdf, overwrite = true)
 
     # Plot location of cell center for volcello, umo, vmo, uo, vo
-    using GLMakie
     fig = Figure()
     ax = Axis(fig[1,1], xlabel = "lon", ylabel = "lat")
     lines!(ax, lon_vertices[:,1,1] |> Vector, lat_vertices[:,1,1] |> Vector)
@@ -79,9 +154,6 @@
     κVML = 0.1    # m^2/s
     κVdeep = 1e-5 # m^2/s
 
-    # Make makemodelgrid
-    modelgrid = makemodelgrid(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
-    (; lon_vertices, lat_vertices) = modelgrid
 
     # Make fuxes from all directions
     ϕ = facefluxesfrommasstransport(; umo, vmo)
@@ -133,9 +205,6 @@
         @test Ttest isa SparseMatrixCSC{Float64, Int}
     end
 
-    @show version = "v$(pkgversion(OceanTransportMatrixBuilder))"
-    outputdir = joinpath("plots", version)
-    mkpath(outputdir)
 
 end
 
