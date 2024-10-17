@@ -8,9 +8,8 @@
     using NetCDF
     using YAXArrays
     using GibbsSeaWater
-    using GLMakie
-    using NaNStatistics
     using DimensionalData
+    using NaNStatistics
 
     # stdlib
     using SparseArrays
@@ -54,7 +53,7 @@
 
     # Make makemodelgrid
     modelgrid = makemodelgrid(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
-    (; lon_vertices, lat_vertices, v3D, zt) = modelgrid
+    (; lon_vertices, lat_vertices, v3D, zt, thkcello) = modelgrid
 
     uo = readcubedata(uo_ds.uo)
     vo = readcubedata(vo_ds.vo)
@@ -82,6 +81,52 @@
     # ct = Conservative Temperature (ITS-90) (°C)
     # p = sea pressure (dbar) (here using 0 pressure to get potential density
     # TODO: CHECK IF THIS IS CORRECT
+
+    # Some parameter values
+    ρ = 1035.0    # kg/m^3
+    # Alternatively, rebuild density from thetao, so, and depth as approximate pressure
+    ZBOT3D = cumsum(thkcello, dims = 3)
+    Z3D = ZBOT3D - 0.5 * thkcello
+    ρ = gsw_rho.(so, ct, Z3D)
+
+    # Diffusivites
+    κH = 500.0    # m^2/s
+    κVML = 0.1    # m^2/s
+    κVdeep = 1e-5 # m^2/s
+
+    # Make fuxes from all directions
+    ϕ = facefluxesfrommasstransport(; umo, vmo)
+
+    # Make fuxes from all directions from velocities
+    ϕ_bis = facefluxesfromvelocities(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, ρ)
+
+    # Make indices
+    indices = makeindices(modelgrid.v3D)
+
+    @test all(.!isnan.(ρ[indices.wet3D])) == true
+
+    # Make transport matrix
+    (; T, Tadv, TκH, TκVML, TκVdeep) = transportmatrix(; ϕ, mlotst, modelgrid, indices, ρ, κH, κVML, κVdeep)
+
+    Tsyms = (:T, :Tadv, :TκH, :TκVML, :TκVdeep)
+	for Ttest in (T, Tadv, TκH, TκVML, TκVdeep)
+        @test Ttest isa SparseMatrixCSC{Float64, Int}
+    end
+
+
+end
+
+@testitem "velocities and mass transports" setup=[LocalBuiltMatrix] tags=[:skipci] begin
+
+    using NaNStatistics
+    using GLMakie
+
+    (; modelgrid, indices, ρθ, v3D, lat, lon, zt, uo, vo, uo_lon, uo_lat, vo_lon, vo_lat,
+    lon_vertices, lat_vertices, indices,
+    umo, vmo, umo_lon, umo_lat, vmo_lon, vmo_lat, model, member, outputdir) = LocalBuiltMatrix
+
+
+
     # plot for sanity check
     begin # plot zonal average
         ρθ2D = dropdims(nansum(ρθ .* v3D, dims = 1) ./ nansum(v3D, dims = 1), dims = 1)
@@ -102,39 +147,8 @@
     save(outputfile, fig)
 
     κGM = 600 # m^2/s
-    uGM, vGM = OceanTransportMatrixBuilder.bolus_GM_velocity(ρθ, κGM, modelgrid)
-    # Turn uGM into a YAXArray by rebuilding from uo
-    uGM_YAXArray = rebuild(uo;
-        data = uGM,
-        dims = dims(uo),
-        metadata = Dict(
-            "origin" => "u GM bolus velocity computed from thetao and so",
-            "kGM" => κGM,
-            "units" => "m/s",
-        )
-    )
-    arrays = Dict(:uo_GM => uGM_YAXArray, :lat => uo_lat, :lon => uo_lon)
-    uGM_ds = Dataset(; uo_ds.properties, arrays...)
-    # Save to netCDF file
-    outputfile = joinpath(outputdir, "uo_GM.nc")
-    @info "uo_GM as netCDF file:\n  $(outputfile)"
-    savedataset(uGM_ds, path = outputfile, driver = :netcdf, overwrite = true)
-    # Turn vGM into a YAXArray by rebuilding from uo
-    vGM_YAXArray = rebuild(vo;
-        data = vGM,
-        dims = dims(vo),
-        metadata = Dict(
-            "origin" => "v GM bolus velocity computed from thetao and so",
-            "kGM" => κGM,
-            "units" => "m/s",
-        )
-    )
-    arrays = Dict(:vo_GM => vGM_YAXArray, :lat => vo_lat, :lon => vo_lon)
-    vGM_ds = Dataset(; vo_ds.properties, arrays...)
-    # Save to netCDF file
-    outputfile = joinpath(outputdir, "vo_GM.nc")
-    @info "Saving vo_GM as netCDF file:\n  $(outputfile)"
-    savedataset(vGM_ds, path = outputfile, driver = :netcdf, overwrite = true)
+    maxslope = 0.01
+    uGM, vGM = OceanTransportMatrixBuilder.bolus_GM_velocity(ρθ, modelgrid; κGM, maxslope)
 
     # Plot location of cell center for volcello, umo, vmo, uo, vo
     fig = Figure()
@@ -146,23 +160,6 @@
     text!(ax, umo_lon[1], umo_lat[1]; text="vmo (i,j)", align = (:center, :bottom))
     text!(ax, vo_lon[1], vo_lat[1]; text="vo (i,j)", align = (:center, :bottom))
     fig
-
-
-    # Some parameter values
-    ρ = 1035.0    # kg/m^3
-    κH = 500.0    # m^2/s
-    κVML = 0.1    # m^2/s
-    κVdeep = 1e-5 # m^2/s
-
-
-    # Make fuxes from all directions
-    ϕ = facefluxesfrommasstransport(; umo, vmo)
-
-    # Make fuxes from all directions from velocities
-    ϕ_bis = facefluxesfromvelocities(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, ρ)
-
-    # Make indices
-    indices = makeindices(modelgrid.v3D)
 
     uo2, uo2_lon, uo2_lat, vo2, vo2_lon, vo2_lat = OceanTransportMatrixBuilder.interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid)
     fig = Figure(size=(1500, 800))
@@ -196,21 +193,9 @@
     hm = heatmap!(ax, indices.wet3D[:,:,1])
     translate!(hm, 0, 0, -100) # move the plot behind the grid
     fig
-
-    # Make transport matrix
-    (; T, Tadv, TκH, TκVML, TκVdeep) = transportmatrix(; ϕ, mlotst, modelgrid, indices, ρ, κH, κVML, κVdeep)
-
-    Tsyms = (:T, :Tadv, :TκH, :TκVML, :TκVdeep)
-	for Ttest in (T, Tadv, TκH, TκVML, TκVdeep)
-        @test Ttest isa SparseMatrixCSC{Float64, Int}
-    end
-
-
 end
 
-
-
-@testitem "Timescales (divergence and mass conservation)" setup=[LocalBuiltMatrix] tags=[:skipci] begin
+@testitem "Divergence and mass conservation" setup=[LocalBuiltMatrix] tags=[:skipci] begin
 
     using Unitful
     using Unitful: s, Myr
@@ -238,7 +223,7 @@ end
 	end
 end
 
-@testitem "Test if flux divergence (not convergence)" setup=[LocalBuiltMatrix] tags=[:skipci] begin
+@testitem "Test flux divergence" setup=[LocalBuiltMatrix] tags=[:skipci] begin
 
     using SparseArrays
     using LinearAlgebra
@@ -364,7 +349,7 @@ end
 
     # Difference between the fluxes from velocities and mass transport
     (; uo, vo, umo, vmo, uo_lon, uo_lat, vo_lon, vo_lat, modelgrid, ρ) = LocalBuiltMatrix
-    umo_bis, vmo_bis = velocity2fluxes(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, ρ)
+    umo_bis, vmo_bis = velocity2fluxes(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, ρ)
     colorrange = 1e9 .* (-1, 1)
     colormap = cgrad(:RdBu, rev=true)
     Δcolorrange = (-5, 5)

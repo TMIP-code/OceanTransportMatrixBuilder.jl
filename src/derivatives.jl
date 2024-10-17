@@ -12,11 +12,11 @@ Returns the discrete difference
 # forward derivative in the i direction for centered data (A-grid)
 function ∂ᵢ₊(χ, modelgrid)
     χ = χ |> Array
-    (; lon, lat, gridtype) = modelgrid
+    (; lon, lat, arakawagrid) = modelgrid
     ∂ᵢ₊χ = zeros(size(χ))
     for I in CartesianIndices(lon)
         P = (lon[I], lat[I])
-        Iᵢ₊₁ = i₊₁(I, gridtype)
+        Iᵢ₊₁ = i₊₁(I, arakawagrid)
         Pᵢ₊₁ = (lon[Iᵢ₊₁], lat[Iᵢ₊₁])
         d = haversine(P, Pᵢ₊₁)
         ∂ᵢ₊χ[I, :] = (χ[Iᵢ₊₁, :] - χ[I, :]) / d
@@ -26,11 +26,11 @@ end
 # backward derivative in the i direction for centered data (A-grid)
 function ∂ᵢ₋(χ, modelgrid)
     χ = χ |> Array
-    (; lon, lat, gridtype) = modelgrid
+    (; lon, lat, arakawagrid) = modelgrid
     ∂ᵢ₋χ = zeros(size(χ))
     for I in CartesianIndices(lon)
         P = (lon[I], lat[I])
-        Iᵢ₋₁ = i₋₁(I, gridtype)
+        Iᵢ₋₁ = i₋₁(I, arakawagrid)
         Pᵢ₋₁ = (lon[Iᵢ₋₁], lat[Iᵢ₋₁])
         d = haversine(P, Pᵢ₋₁)
         ∂ᵢ₋χ[I, :] = (χ[I, :] - χ[Iᵢ₋₁, :]) / d
@@ -40,11 +40,11 @@ end
 # forward derivative in the j direction
 function ∂ⱼ₊(χ, modelgrid)
     χ = χ |> Array
-    (; lon, lat, gridtype) = modelgrid
+    (; lon, lat, arakawagrid) = modelgrid
     ∂ⱼ₊χ = zeros(size(χ))
     for I in CartesianIndices(lon)
         P = (lon[I], lat[I])
-        Iᵢ₊₁ = j₊₁(I, gridtype)
+        Iᵢ₊₁ = j₊₁(I, arakawagrid)
         Pᵢ₊₁ = (lon[Iᵢ₊₁], lat[Iᵢ₊₁])
         d = haversine(P, Pᵢ₊₁)
         ∂ⱼ₊χ[I, :] = (χ[Iᵢ₊₁, :] - χ[I, :]) / d
@@ -54,11 +54,11 @@ end
 # backward derivative in the j direction
 function ∂ⱼ₋(χ, modelgrid)
     χ = χ |> Array
-    (; lon, lat, gridtype) = modelgrid
+    (; lon, lat, arakawagrid) = modelgrid
     ∂ⱼ₋χ = zeros(size(χ))
     for I in CartesianIndices(lon)
         P = (lon[I], lat[I])
-        Iᵢ₋₁ = j₋₁(I, gridtype)
+        Iᵢ₋₁ = j₋₁(I, arakawagrid)
         Pᵢ₋₁ = (lon[Iᵢ₋₁], lat[Iᵢ₋₁])
         d = haversine(P, Pᵢ₋₁)
         ∂ⱼ₋χ[I, :] = (χ[I, :] - χ[Iᵢ₋₁, :]) / d
@@ -68,12 +68,12 @@ end
 # derivative in the k direction
 function ∂ₖ₊(χ, modelgrid)
     χ = χ |> Array
-    (; zt, DZT3d, gridtype) = modelgrid
+    (; zt, thkcello, arakawagrid) = modelgrid
     ∂ₖ₊χ = zeros(size(χ))
     for I in CartesianIndices(χ)
-        Iᵢ₊₁ = k₊₁(I, gridtype)
+        Iᵢ₊₁ = k₊₁(I, arakawagrid)
         isnothing(Iᵢ₊₁) && continue
-        h = (DZT3d[I] + DZT3d[Iᵢ₊₁]) / 2
+        h = (thkcello[I] + thkcello[Iᵢ₊₁]) / 2
         ∂ₖ₊χ[I] = (χ[Iᵢ₊₁] - χ[I]) / h
     end
     return ∂ₖ₊χ
@@ -81,12 +81,12 @@ end
 # backward derivative in the k direction
 function ∂ₖ₋(χ, modelgrid)
     χ = χ |> Array
-    (; zt, DZT3d, gridtype) = modelgrid
+    (; zt, thkcello, arakawagrid) = modelgrid
     ∂ₖ₋χ = zeros(size(χ))
     for I in CartesianIndices(χ)
-        Iᵢ₋₁ = k₋₁(I, gridtype)
+        Iᵢ₋₁ = k₋₁(I, arakawagrid)
         isnothing(Iᵢ₋₁) && continue
-        h = (DZT3d[I] + DZT3d[Iᵢ₋₁]) / 2
+        h = (thkcello[I] + thkcello[Iᵢ₋₁]) / 2
         ∂ₖ₋χ[I] = (χ[I] - χ[Iᵢ₋₁]) / h
     end
     return ∂ₖ₋χ
@@ -94,49 +94,56 @@ end
 
 # interpolation in the i direction
 function itpₖ₊(χ, modelgrid)
-    (; gridtype) = modelgrid
+    (; arakawagrid) = modelgrid
     χ = χ |> Array
     itpₖ₊χ = zeros(size(χ))
     for I in CartesianIndices(χ)
-        Iᵢ₊₁ = k₊₁(I, gridtype)
+        Iᵢ₊₁ = k₊₁(I, arakawagrid)
         isnothing(Iᵢ₊₁) && continue
         itpₖ₊χ[I] = (χ[Iᵢ₊₁] + χ[I]) / 2
     end
     return itpₖ₊χ
 end
 function itpₖ₋(χ, modelgrid)
-    (; gridtype) = modelgrid
+    (; arakawagrid) = modelgrid
     χ = χ |> Array
     itpₖ₋χ = zeros(size(χ))
     for I in CartesianIndices(χ)
-        Iᵢ₋₁ = k₋₁(I, gridtype)
+        Iᵢ₋₁ = k₋₁(I, arakawagrid)
         isnothing(Iᵢ₋₁) && continue
         itpₖ₋χ[I] = (χ[Iᵢ₋₁] + χ[I]) / 2
     end
     return itpₖ₋χ
 end
 function itpᵢ₊(χ, modelgrid)
-    (; gridtype) = modelgrid
+    (; arakawagrid) = modelgrid
     χ = χ |> Array
     itpᵢ₊χ = zeros(size(χ))
     for I in CartesianIndices(χ)
-        Iᵢ₊₁ = i₊₁(I, gridtype)
+        Iᵢ₊₁ = i₊₁(I, arakawagrid)
         itpᵢ₊χ[I] = (χ[Iᵢ₊₁] + χ[I]) / 2
     end
     return itpᵢ₊χ
 end
 function itpⱼ₊(χ, modelgrid)
-    (; gridtype) = modelgrid
+    (; arakawagrid) = modelgrid
     χ = χ |> Array
     itpⱼ₊χ = zeros(size(χ))
     for I in CartesianIndices(χ)
-        Iᵢ₊₁ = j₊₁(I, gridtype)
+        Iᵢ₊₁ = j₊₁(I, arakawagrid)
         itpⱼ₊χ[I] = (χ[Iᵢ₊₁] + χ[I]) / 2
     end
     return itpⱼ₊χ
 end
 
+"""
+    bolus_GM_velocity(σ, modelgrid; κGM = 600, maxslope = 0.01)
 
+Returns the bolus velocity field due to the Gent-McWilliams parameterization,
+computed from the neutral density field `σ` (or potential density, ρθ in kg/m³).
+
+Note: This is experimental at this stage.
+"""
 function bolus_GM_velocity(σ, modelgrid; κGM = 600, maxslope = 0.01)
     # σ is neutral density (or potential density, ρθ in kg/m³)
     σ = replace(σ, missing => 0, NaN => 0)
@@ -193,13 +200,13 @@ end
 
 
 # function ∂ᵢ(χ, modelgrid, shift=0,  d=:f)
-#     (;lon, lat, gridtype) = modelgrid
+#     (;lon, lat, arakawagrid) = modelgrid
 #     m = 1
 #     ∂ᵢχ = zeros(size(χ))
 #     # Draw a line along coordinate i and compute the distances
 #     d = dᵢ₊(lon, lat)
 #     for I in CartesianIndices(lon)
-#         movingI = SVector(ishift(I, gridtype, xxx))
+#         movingI = SVector(ishift(I, arakawagrid, xxx))
 #         i, j = I.I
 #         x = SVector(0, d[i])
 #         w = stencil(x, 0, χ)

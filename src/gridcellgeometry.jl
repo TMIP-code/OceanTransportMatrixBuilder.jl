@@ -1,19 +1,25 @@
 
 
-abstract type ArakawaGrid end
+abstract type ArakawaGridCell end
 
-struct AGrid <: ArakawaGrid
+struct AGridCell <: ArakawaGridCell
+    u_pos::Symbol
+    v_pos::Symbol
 end
 
-struct BGrid <: ArakawaGrid
+struct BGridCell <: ArakawaGridCell
+    u_pos::Symbol
+    v_pos::Symbol
 end
 
-struct CGrid <: ArakawaGrid
+struct CGridCell <: ArakawaGridCell
+    u_pos::Symbol
+    v_pos::Symbol
 end
 
 
 """
-    arakawa, uo_pos, vo_pos, uo_relerr, vo_relerr = gridtype(uo_lon, uo_lat, vo_lon, vo_lat, modelgrid)
+    arakawa = getarakawagrid(u_lon, u_lat, v_lon, v_lat, modelgrid)
 
 Returns the type of the grid (A, B, or C), the grid position of the velocity points,
 and the error of that position relative to the perimeter of the cell.
@@ -43,14 +49,14 @@ The different Arakawa grids recongnized here are:
 where each grid is centered in C.
 Also returns the distances from the velocity points to the grid points.
 """
-function gridtype(uo_lon, uo_lat, vo_lon, vo_lat, modelgrid)
+function getarakawagrid(u_lon, u_lat, v_lon, v_lat, modelgrid)
 
     # Unpack modelgrid
     (; lon, lat, lon_vertices, lat_vertices) = modelgrid
 
     i = j = 1
-    uo_point = (uo_lon[i, j], uo_lat[i, j])
-    vo_point = (vo_lon[i, j], vo_lat[i, j])
+    u_point = (u_lon[i, j], u_lat[i, j])
+    v_point = (v_lon[i, j], v_lat[i, j])
 
     C = (lon[i, j], lat[i, j])
     SW = (lon_vertices[1, i, j], lat_vertices[1, i, j])
@@ -64,75 +70,74 @@ function gridtype(uo_lon, uo_lat, vo_lon, vo_lat, modelgrid)
 
     cell = (; C, SW, SE, NE, NW, S, N, W, E)
 
-    uo_distances = (; (k => haversine(P, uo_point) for (k,P) in pairs(cell))...)
-    vo_distances = (; (k => haversine(P, vo_point) for (k,P) in pairs(cell))...)
+    u_distances = (; (k => haversine(P, u_point) for (k,P) in pairs(cell))...)
+    v_distances = (; (k => haversine(P, v_point) for (k,P) in pairs(cell))...)
 
-    uo_distance, uo_pos = findmin(uo_distances)
-    vo_distance, vo_pos = findmin(vo_distances)
+    u_distance, u_pos = findmin(u_distances)
+    v_distance, v_pos = findmin(v_distances)
 
     # Arakawa grid type
-    if uo_pos == vo_pos == :C
-        arakawa = AGrid()
-    elseif uo_pos == vo_pos && uo_pos ∈ (:NE, :NW, :SE, :SW)
-        arakawa = BGrid()
-    elseif uo_pos ∈ (:E, :W) && vo_pos ∈ (:N, :S)
-        arakawa = CGrid()
+    if u_pos == v_pos == :C
+        arakawa = AGridCell(u_pos, v_pos)
+    elseif u_pos == v_pos && u_pos ∈ (:NE, :NW, :SE, :SW)
+        arakawa = BGridCell(u_pos, v_pos)
+    elseif u_pos ∈ (:E, :W) && v_pos ∈ (:N, :S)
+        arakawa = CGridCell(u_pos, v_pos)
     else
         error("Unknown Arakawa grid type")
     end
 
     cellperimeter = haversine(SW, SE) + haversine(SE, NE) + haversine(NE, NW) + haversine(NW, SW)
-    uo_relerr = uo_distance / cellperimeter
-    vo_relerr = vo_distance / cellperimeter
+    relerr = (u_distance + v_distance) / cellperimeter
 
-    return arakawa, uo_pos, vo_pos, uo_relerr, vo_relerr
+    relerr > 0.01 && warn("Relative error in grid positions in $arakawa is $relerr")
+
+    return arakawa
 
 end
 
 """
-    uo, uo_lon, uo_lat, vo, vo_lon, vo_lat = interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid)
+    u, u_lon, u_lat, v, v_lon, v_lat = interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, modelgrid)
 
-Interpolates the velocity fields `uo` and `vo` from B- or C-grid
+Interpolates the velocity fields `u` and `v` from B- or C-grid
 onto the default C-grid (centered on the cell faces).
 """
-interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid) = interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, gridtype(uo_lon, uo_lat, vo_lon, vo_lat, modelgrid))
-interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, ::CGrid) = uo, uo_lon, uo_lat, vo, vo_lon, vo_lat
-interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, ::AGrid) = error("Interpolation not implemented for this grid type")
-# TODO this is clumsy to have to pass the gridtype but then recompute it
-function interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, arakawa::BGrid)
+interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, modelgrid) = interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, modelgrid, getarakawagrid(u_lon, u_lat, v_lon, v_lat, modelgrid))
+interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, modelgrid, ::CGridCell) = u, u_lon, u_lat, v, v_lon, v_lat
+interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, modelgrid, ::AGridCell) = error("Interpolation not implemented for A-grid type")
+function interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, modelgrid, arakawa::BGridCell)
 
-    arakawa, uo_pos, vo_pos, uo_relerr, vo_relerr = gridtype(uo_lon, uo_lat, vo_lon, vo_lat, modelgrid)
+    (; u_pos, v_pos) = arakawa
+    u_pos == v_pos == :NE || error("Interpolation not implemented for this B-grid($u_pos,$v_pos) type")
 
-    uo_pos == vo_pos == :NE || error("Interpolation not implemented for this B-grid type")
+    _FillValue = u.properties["_FillValue"]
 
-    _FillValue = uo.properties["_FillValue"]
+    # Make sure u and v are in memory
+    u = u |> Array
+    v = v |> Array
 
-    # Make sure uo and vo are in memory
-    uo = uo |> Array
-    vo = vo |> Array
-
-    nx, ny, nz = size(uo)
+    nx, ny, nz = size(u)
 
     # unpack modelgrid
     (; lon_vertices, lat_vertices) = modelgrid
 
-    # It seems that uo/vo is NaN on boundaries (for ACCESS-ESM1-5)
-    # and that umo/vmo were computed as if uo/vo were 0 on boundaries
+    # It seems that u/v is NaN on boundaries (for ACCESS-ESM1-5)
+    # and that umo/vmo were computed as if u/v were 0 on boundaries
     # so that's what we do here
-    uo2 = replace(uo, _FillValue => 0.0)
-    vo2 = replace(vo, _FillValue => 0.0)
-    uo2 = 0.5(uo2 + [fill(0.0, nx, 1, nz);; uo2[:, 1:end-1, :]])
-    vo2 = 0.5(vo2 + [fill(0.0, 1, ny, nz); vo2[1:end-1, :, :]])
+    u2 = replace(u, _FillValue => 0.0)
+    v2 = replace(v, _FillValue => 0.0)
+    u2 = 0.5(u2 + [fill(0.0, nx, 1, nz);; u2[:, 1:end-1, :]])
+    v2 = 0.5(v2 + [fill(0.0, 1, ny, nz); v2[1:end-1, :, :]])
     SE_points = [(lon, lat) for (lon, lat) in zip(lon_vertices[2, :, :], lat_vertices[2, :, :])]
     NE_points = [(lon, lat) for (lon, lat) in zip(lon_vertices[3, :, :], lat_vertices[3, :, :])]
     NW_points = [(lon, lat) for (lon, lat) in zip(lon_vertices[4, :, :], lat_vertices[4, :, :])]
-    uo2_points = [midpointonsphere(SE, NE) for (SE, NE) in zip(NE_points, SE_points)]
-    vo2_points = [midpointonsphere(NE, NW) for (NE, NW) in zip(NW_points, NE_points)]
-    uo2_lon = [P[1] for P in uo2_points]
-    uo2_lat = [P[2] for P in uo2_points]
-    vo2_lon = [P[1] for P in vo2_points]
-    vo2_lat = [P[2] for P in vo2_points]
-    return uo2, uo2_lon, uo2_lat, vo2, vo2_lon, vo2_lat
+    u2_points = [midpointonsphere(SE, NE) for (SE, NE) in zip(NE_points, SE_points)]
+    v2_points = [midpointonsphere(NE, NW) for (NE, NW) in zip(NW_points, NE_points)]
+    u2_lon = [P[1] for P in u2_points]
+    u2_lat = [P[2] for P in u2_points]
+    v2_lon = [P[1] for P in v2_points]
+    v2_lat = [P[2] for P in v2_points]
+    return u2, u2_lon, u2_lat, v2, v2_lon, v2_lat
 
 end
 

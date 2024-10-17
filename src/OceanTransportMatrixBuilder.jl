@@ -9,8 +9,8 @@ using Distances: haversine
 
 include("preprocessing.jl")
 include("matrixbuilding.jl")
-include("grids.jl")
-include("topology.jl")
+include("gridcellgeometry.jl")
+include("gridtopology.jl")
 include("derivatives.jl")
 include("extratools.jl") # <- I think this should be in a separate "base" repo
 

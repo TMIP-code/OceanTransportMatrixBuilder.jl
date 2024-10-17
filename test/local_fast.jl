@@ -63,7 +63,7 @@
 
         # Make makemodelgrid
         modelgrid = makemodelgrid(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
-        (; lon_vertices, lat_vertices, edge_length_2D, distance_to_edge_2D, lon, lat, zt, area2D, v3D, DZT3d) = modelgrid
+        (; lon_vertices, lat_vertices, edge_length_2D, distance_to_edge_2D, lon, lat, zt, area2D, v3D, thkcello) = modelgrid
 
         # Make indices
         indices = makeindices(v3D)
@@ -222,7 +222,7 @@
 
 
 
-        # plot DZT3d every 1000m
+        # plot thkcello every 1000m
         fig = Figure(size=(1000, 750))
         zs = [0 1000; 2000 3000; 4000 5000]
         colorrange = (0, 500) # m
@@ -231,7 +231,7 @@
             i, j = Tuple(idx)
             ax = Axis(fig[i, j], xlabel="i", ylabel="j")
             k = findfirst(zt .> zs[i, j])
-            hm = heatmap!(ax, ustrip.(m, DZT3d[:, :, k] * m); colorrange)
+            hm = heatmap!(ax, ustrip.(m, thkcello[:, :, k] * m); colorrange)
             customdecorations!(ax; i, j, imax=size(zs, 1))
             text!(ax, 0.5, 1, text="$(zs[i,j])m", align=(:center, :top), offset=(0, -2), space=:relative)
         end

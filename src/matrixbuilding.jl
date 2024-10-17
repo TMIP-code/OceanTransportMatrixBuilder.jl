@@ -8,9 +8,11 @@ function buildTadv(; ϕ, modelgrid, indices, ρ)
     # default ρ = 1035 kg/m^3 is the value originally used by Chamberlain et al. (2019)
 
 	@info "Building Tadv"
-	𝑖s, 𝑗s, Tvals = upwind_advection_operator_sparse_entries(; ϕ, modelgrid, indices, ρ)
+	𝑖s, 𝑗s, Tvals = upwind_advection_operator_sparse_entries(ϕ, modelgrid, indices, ρ)
 
     N = indices.N
+
+	any(isnan.(Tvals)) && error("Tadv contains NaNs.")
 
 	Tadv = sparse(𝑖s, 𝑗s, Tvals, N, N)
 
@@ -32,6 +34,8 @@ function buildTκH(; modelgrid, indices, ρ, κH)
 	@info "Building TκH"
 	𝑖s, 𝑗s, Tvals = horizontal_diffusion_operator_sparse_entries(; modelgrid, indices, κH, ΩH)
 
+	any(isnan.(Tvals)) && error("TκH contains NaNs.")
+
 	TκH = sparse(𝑖s, 𝑗s, Tvals, N, N)
 
 	return TκH
@@ -49,7 +53,7 @@ function buildTκVML(; mlotst, modelgrid, indices, κVML)
     (; zt, ) = modelgrid
 
     # Unpack indices
-    (; Lwet) = indices
+    (; Lwet, N) = indices
 
 	mlotst = mlotst |> Array # to prevent slow getindex for lazily loaded data?
 
@@ -59,7 +63,7 @@ function buildTκVML(; mlotst, modelgrid, indices, κVML)
 	@info "Building TκVML "
 	𝑖s, 𝑗s, Tvals = vertical_diffusion_operator_sparse_entries(; modelgrid, indices, κV = κVML, Ω)
 
-    N = indices.N
+	any(isnan.(Tvals)) && error("TκVML contains NaNs.")
 
 	TκVML = sparse(𝑖s, 𝑗s, Tvals, N, N)
 
@@ -81,6 +85,8 @@ function buildTκVdeep(; mlotst, modelgrid, indices, κVdeep)
 
 	@info "Building TκVdeep"
 	𝑖s, 𝑗s, Tvals = vertical_diffusion_operator_sparse_entries(; modelgrid, indices, κV = κVdeep, Ω)
+
+	any(isnan.(Tvals)) && error("TκVdeep contains NaNs.")
 
 	TκVdeep = sparse(𝑖s, 𝑗s, Tvals, N, N)
 
@@ -129,6 +135,15 @@ end
 # 	T[i,j] = -ϕ[j→i] / m[i]             units = kg s⁻¹ / kg = s⁻¹
 # and ϕ[j→i] / m[j] should be added to the diagonal T[j,j].
 
+# Is this mass conserving?
+# Only if
+#   v[i] * T[i,i] + v[j] * T[j,i] ≈ 0
+#   = vi ϕ[i→j] / m[i] + vj -ϕ[i→j] / m[j]
+#   = ϕ[i→j] / ρ[i] - ϕ[i→j] / ρ[j]
+# i.e., iff
+#   ρ[i] = ρ[j]
+# So I must use the mean density between facing cells.
+
 # There are three ways to index:
 # - Cartesian indices (i,j,k)
 # - Linear index L𝑖
@@ -139,74 +154,85 @@ end
 # For the last one, I make a 3D array filled with the wet linear indices
 
 """
-    upwind_advection_operator_sparse_entries(; ϕ, modelgrid, indices, ρ)
+    upwind_advection_operator_sparse_entries(ϕ, modelgrid, indices, ρ)
 
 Return the sparse (i, j, v) for the upwind advection operator Tadv.
 """
-function upwind_advection_operator_sparse_entries(; ϕ, modelgrid, indices, ρ)
+function upwind_advection_operator_sparse_entries(ϕ, modelgrid, indices, ρ::Number)
+	# If ρ is a scalar, broadcast it to the modelgrid size
+	ρ = fill(ρ, size(modelgrid.v3D))
+	return upwind_advection_operator_sparse_entries(ϕ, modelgrid, indices, ρ)
+end
+function upwind_advection_operator_sparse_entries(ϕ, modelgrid, indices, ρ)
 
     # Unpack model grid
-    (; v3D, gridtype) = modelgrid
+    (; v3D, arakawagrid) = modelgrid
     # Unpack indices
-    (; wet3D, Lwet, Lwet3D, C) = indices
+    (; Lwet, Lwet3D, C) = indices
 
+	any(isnan.(ρ[Lwet])) && error("ρ contains NaNs")
 
 	𝑖s, 𝑗s, Tvals = Int[], Int[], Float64[]
-	nxyz = size(wet3D)
-    nx, ny, _ = nxyz
 
     @time for 𝑖 in eachindex(Lwet)
 		L𝑖 = Lwet[𝑖]
 		C𝑖 = C[L𝑖]
 		i, j, k = C𝑖.I
-		m𝑖 = v3D[C𝑖] * ρ
+		v𝑖 = v3D[C𝑖]
+		ρ𝑖 = ρ[C𝑖]
 		# From West
 		ϕwest = ϕ.west[C𝑖]
 		if ϕwest > 0
-			C𝑗 = i₋₁(C𝑖, gridtype)
+			C𝑗 = i₋₁(C𝑖, arakawagrid)
 			𝑗 = Lwet3D[C𝑗]
-			m𝑗 = v3D[C𝑗] * ρ
-			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕwest, m𝑖, m𝑗)
+			v𝑗 = v3D[C𝑗]
+			ρ𝑗 = ρ[C𝑗]
+			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕwest, ρ𝑖, ρ𝑗, v𝑖, v𝑗)
 		end
 		# From East
 		ϕeast = ϕ.east[C𝑖]
 		if ϕeast < 0
-			C𝑗 = i₊₁(C𝑖, gridtype)
+			C𝑗 = i₊₁(C𝑖, arakawagrid)
 			𝑗 = Lwet3D[C𝑗]
-			m𝑗 = v3D[C𝑗] * ρ
-			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, -ϕeast, m𝑖, m𝑗)
+			v𝑗 = v3D[C𝑗]
+			ρ𝑗 = ρ[C𝑗]
+			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, -ϕeast, ρ𝑖, ρ𝑗, v𝑖, v𝑗)
 		end
 		# From South
 		ϕsouth = ϕ.south[C𝑖]
 		if ϕsouth > 0
-			C𝑗 = j₋₁(C𝑖, gridtype)
+			C𝑗 = j₋₁(C𝑖, arakawagrid)
 			𝑗 = Lwet3D[C𝑗]
-			m𝑗 = v3D[C𝑗] * ρ
-			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕsouth, m𝑖, m𝑗)
+			v𝑗 = v3D[C𝑗]
+			ρ𝑗 = ρ[C𝑗]
+			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕsouth, ρ𝑖, ρ𝑗, v𝑖, v𝑗)
 		end
 		# From North (Special case with north bipole)
 		ϕnorth = ϕ.north[C𝑖]
 		if ϕnorth < 0
-			C𝑗 = j₊₁(C𝑖, gridtype)
+			C𝑗 = j₊₁(C𝑖, arakawagrid)
 			𝑗 = Lwet3D[C𝑗]
-			m𝑗 = v3D[C𝑗] * ρ
-			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, -ϕnorth, m𝑖, m𝑗)
+			v𝑗 = v3D[C𝑗]
+			ρ𝑗 = ρ[C𝑗]
+			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, -ϕnorth, ρ𝑖, ρ𝑗, v𝑖, v𝑗)
 		end
 		# From Bottom
 		ϕbottom = ϕ.bottom[C𝑖]
 		if ϕbottom > 0
-			C𝑗 = k₊₁(C𝑖, gridtype)
+			C𝑗 = k₊₁(C𝑖, arakawagrid)
 			𝑗 = Lwet3D[C𝑗]
-			m𝑗 = v3D[C𝑗] * ρ
-			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕbottom, m𝑖, m𝑗)
+			v𝑗 = v3D[C𝑗]
+			ρ𝑗 = ρ[C𝑗]
+			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕbottom, ρ𝑖, ρ𝑗, v𝑖, v𝑗)
 		end
 		# From Top
 		ϕtop = ϕ.top[C𝑖]
 		if ϕtop < 0 && k > 1 # Evaporation/precipitation -> no change to χ
-			C𝑗 = k₋₁(C𝑖, gridtype)
+			C𝑗 = k₋₁(C𝑖, arakawagrid)
 			𝑗 = Lwet3D[C𝑗]
-			m𝑗 = v3D[C𝑗] * ρ
-			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, -ϕtop, m𝑖, m𝑗)
+			v𝑗 = v3D[C𝑗]
+			ρ𝑗 = ρ[C𝑗]
+			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, -ϕtop, ρ𝑖, ρ𝑗, v𝑖, v𝑗)
 		end
 	end
 	return 𝑖s, 𝑗s, Tvals
@@ -214,11 +240,14 @@ end
 
 
 """
-    pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕ, m𝑖, m𝑗)
+    pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕ, ρ𝑖, ρ𝑗, v𝑖, v𝑗)
 
 Pushes the sparse indices and values into (𝑖s, 𝑗s, Tvals) corresponding to the j→i advection.
 """
-function pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕ, m𝑖, m𝑗)
+function pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕ, ρ𝑖, ρ𝑗, v𝑖, v𝑗)
+	ρ = (ρ𝑖 + ρ𝑗) / 2
+	m𝑖 = ρ * v𝑖
+	m𝑗 = ρ * v𝑗
 	push!(𝑖s, 𝑖)
 	push!(𝑗s, 𝑗)
 	push!(Tvals, -ϕ / m𝑖)
@@ -270,13 +299,13 @@ Return the sparse (i, j, v) for the horizontal diffusion operator TκH.
 function horizontal_diffusion_operator_sparse_entries(; modelgrid, indices, κH, ΩH)
 
     # Unpack model grid
-    (; v3D, edge_length_2D, lon, lat, DZT3d, gridtype) = modelgrid
+    (; v3D, edge_length_2D, lon, lat, thkcello, arakawagrid) = modelgrid
     # Unpack indices
     (; wet3D, Lwet, Lwet3D, C) = indices
 
 	𝑖s, 𝑗s, Tvals = Int[], Int[], Float64[]
-	nxyz = size(wet3D)
-    nx, ny, _ = nxyz
+
+    ny = size(wet3D, 2) # Should not be needed once oppdir is dealt by topology functions
 
     @time for 𝑖 in eachindex(Lwet)
         ΩH[𝑖] || continue # only continue if inside ΩH
@@ -285,15 +314,15 @@ function horizontal_diffusion_operator_sparse_entries(; modelgrid, indices, κH,
 		i, j, k = C𝑖.I
 		V = v3D[C𝑖]
 		# From West
-		C𝑗W = i₋₁(C𝑖, gridtype)
+		C𝑗W = i₋₁(C𝑖, arakawagrid)
         if !isnothing(C𝑗W)
 			𝑗W = Lwet3D[C𝑗W]
 			if !ismissing(𝑗W) && ΩH[𝑗W]
 				iW, jW, _ = C𝑗W.I
 				# (𝑖 == 𝑗W) && @show(i, j, iW, jW)
 				# I take the minimum area from both dirs (through which mixing goes through)
-				aij = verticalfacearea(edge_length_2D, DZT3d, i, j, k, :west)
-				aji = verticalfacearea(edge_length_2D, DZT3d, iW, jW, k, :east)
+				aij = verticalfacearea(edge_length_2D, thkcello, i, j, k, :west)
+				aji = verticalfacearea(edge_length_2D, thkcello, iW, jW, k, :east)
 				a = min(aij, aji)
 				# I take the mean distance from both dirs
 				d = horizontalcentroiddistance(lon, lat, i, j, iW, jW)
@@ -301,35 +330,35 @@ function horizontal_diffusion_operator_sparse_entries(; modelgrid, indices, κH,
 			end
 		end
         # From East
-		C𝑗E = i₊₁(C𝑖, gridtype)
+		C𝑗E = i₊₁(C𝑖, arakawagrid)
         if !isnothing(C𝑗E)
 			𝑗E = Lwet3D[C𝑗E]
 			if !ismissing(𝑗E) && ΩH[𝑗E]
 				iE, jE, _ = C𝑗E.I
 				# (𝑖 == 𝑗E) && @show(i, j, iE, jE)
-				aij = verticalfacearea(edge_length_2D, DZT3d, i, j, k, :east)
-				aji = verticalfacearea(edge_length_2D, DZT3d, iE, jE, k, :west)
+				aij = verticalfacearea(edge_length_2D, thkcello, i, j, k, :east)
+				aji = verticalfacearea(edge_length_2D, thkcello, iE, jE, k, :west)
 				a = min(aij, aji)
 				d = horizontalcentroiddistance(lon, lat, i, j, iE, jE)
 				pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗E, κH, a, d, V)
 			end
 		end
         # From South
-		C𝑗S = j₋₁(C𝑖, gridtype)
+		C𝑗S = j₋₁(C𝑖, arakawagrid)
 		if !isnothing(C𝑗S)
 			𝑗S = Lwet3D[C𝑗S]
 			if !ismissing(𝑗S) && ΩH[𝑗S]
 				iS, jS, _ = C𝑗S.I
 				# (𝑖 == 𝑗S) && @show(i, j, iS, jS)
-				aij = verticalfacearea(edge_length_2D, DZT3d, i, j, k, :south)
-				aji = verticalfacearea(edge_length_2D, DZT3d, iS, jS, k, :north)
+				aij = verticalfacearea(edge_length_2D, thkcello, i, j, k, :south)
+				aji = verticalfacearea(edge_length_2D, thkcello, iS, jS, k, :north)
 				a = min(aij, aji)
 				d = horizontalcentroiddistance(lon, lat, i, j, iS, jS)
 				pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗S, κH, a, d, V)
 			end
 		end
         # From North
-		C𝑗N = j₊₁(C𝑖, gridtype)
+		C𝑗N = j₊₁(C𝑖, arakawagrid)
         if !isnothing(C𝑗N)
 			𝑗N = Lwet3D[C𝑗N]
 			if !ismissing(𝑗N) && ΩH[𝑗N]
@@ -338,8 +367,8 @@ function horizontal_diffusion_operator_sparse_entries(; modelgrid, indices, κH,
 				# Note that the opposite direction (oppdir) is still north at j == ny
 				# TODO: implement this into a topology.jl function
 				oppdir = (j == ny) ? :north : :south
-				aij = verticalfacearea(edge_length_2D, DZT3d, i, j, k, :north)
-				aji = verticalfacearea(edge_length_2D, DZT3d, iN, jN, k, oppdir)
+				aij = verticalfacearea(edge_length_2D, thkcello, i, j, k, :north)
+				aji = verticalfacearea(edge_length_2D, thkcello, iN, jN, k, oppdir)
 				a = min(aij, aji)
 				d = horizontalcentroiddistance(lon, lat, i, j, iN, jN)
 				pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗N, κH, a, d, V)
@@ -377,7 +406,7 @@ end
 function vertical_diffusion_operator_sparse_entries(; modelgrid, indices, κV, Ω)
 
     # Unpack model grid
-    (; v3D, area2D, zt, gridtype) = modelgrid
+    (; v3D, area2D, zt, arakawagrid) = modelgrid
     # Unpack indices
     (; wet3D, Lwet, Lwet3D, C) = indices
 
@@ -393,7 +422,7 @@ function vertical_diffusion_operator_sparse_entries(; modelgrid, indices, κV, �
 		V = v3D[C𝑖]
         a = area2D[i,j]
 		# From Bottom
-		C𝑗B = k₊₁(C𝑖, gridtype)
+		C𝑗B = k₊₁(C𝑖, arakawagrid)
 		if !isnothing(C𝑗B)
 			𝑗B = Lwet3D[C𝑗B]
 			if !ismissing(𝑗B) && Ω[𝑗B] # only continue if inside Ω
@@ -403,7 +432,7 @@ function vertical_diffusion_operator_sparse_entries(; modelgrid, indices, κV, �
 			end
 		end
 		# From Top
-		C𝑗T = k₋₁(C𝑖, gridtype)
+		C𝑗T = k₋₁(C𝑖, arakawagrid)
 		if !isnothing(C𝑗T)
 			𝑗T = Lwet3D[C𝑗T]
 			if !ismissing(𝑗T) && Ω[𝑗T] # only continue if inside Ω
