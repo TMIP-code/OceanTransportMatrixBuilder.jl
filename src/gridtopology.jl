@@ -52,6 +52,7 @@ j₋₁(C::CartesianIndex{2}, ::AbstractGridTopology) = C.I[2] > 1 ? C + Cartesi
 # No connection by default in the k direction (depth)
 k₊₁(C, g::AbstractGridTopology) = C.I[3] < g.nz ? C + CartesianIndex(0, 0, 1) : nothing
 k₋₁(C, ::AbstractGridTopology) = C.I[3] > 1 ? C + CartesianIndex(0, 0, -1) : nothing
+getindexornan(χ, I) = isnothing(I) ? NaN : χ[I] # TODO check that this is going to work
 
 
 
@@ -102,3 +103,16 @@ k₊₁(C, ::UnknownGridTopology) = error("Unknown grid type")
 k₋₁(C, ::UnknownGridTopology) = error("Unknown grid type")
 
 
+# Abstract away the coordinate directions
+# to reduce boilerplate code
+struct Icoord end
+struct Jcoord end
+struct Kcoord end
+
+# Index shift functions
+idx₊₁(::Icoord) = i₊₁
+idx₊₁(::Jcoord) = j₊₁
+idx₊₁(::Kcoord) = k₊₁
+idx₋₁(::Icoord) = i₋₁
+idx₋₁(::Jcoord) = j₋₁
+idx₋₁(::Kcoord) = k₋₁

@@ -61,9 +61,9 @@
         lat_vertices = readcubedata(getproperty(volcello_ds, lat_vertices_key))
 
 
-        # Make makemodelgrid
-        modelgrid = makemodelgrid(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
-        (; lon_vertices, lat_vertices, edge_length_2D, distance_to_edge_2D, lon, lat, zt, area2D, v3D, thkcello) = modelgrid
+        # Make makegridmetrics
+        gridmetrics = makegridmetrics(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
+        (; lon_vertices, lat_vertices, edge_length_2D, distance_to_edge_2D, lon, lat, zt, area2D, v3D, thkcello) = gridmetrics
 
         # Make indices
         indices = makeindices(v3D)

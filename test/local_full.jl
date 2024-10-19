@@ -51,9 +51,9 @@
     lon_vertices = readcubedata(volcello_ds.lon_verticies) # xmip issue: https://github.com/jbusecke/xMIP/issues/369
     lat_vertices = readcubedata(volcello_ds.lat_verticies) # xmip issue: https://github.com/jbusecke/xMIP/issues/369
 
-    # Make makemodelgrid
-    modelgrid = makemodelgrid(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
-    (; lon_vertices, lat_vertices, v3D, zt, thkcello) = modelgrid
+    # Make makegridmetrics
+    gridmetrics = makegridmetrics(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
+    (; lon_vertices, lat_vertices, Z3D, v3D, zt, thkcello) = gridmetrics
 
     uo = readcubedata(uo_ds.uo)
     vo = readcubedata(vo_ds.vo)
@@ -72,22 +72,20 @@
     @show 30 < nanmean(so) < 40
     # Convert thetao and so to density
     ct = gsw_ct_from_pt.(so, thetao)
-    @show nanmean(ct)
-    ρθ = gsw_rho.(so, ct, 0)
-    @show nanmean(ρθ)
+    ρ = gsw_rho.(so, ct, Z3D)
+    # TODO: Check if this is correct usage of gsw functions!
+    # Alternatively use a fixed density:
+    # ρ = 1035.0    # kg/m^3
+
+    # Below is commented out but should eventually be teseted for neutral/potential density
+    # @show nanmean(ct)
+    # ρθ = gsw_rho.(so, ct, 0)
+    # @show nanmean(ρθ)
     # from MATLAB GSW toolbox:
     # gsw_rho.(so, ct, p)
     # so = Absolute Salinity (g/kg)
     # ct = Conservative Temperature (ITS-90) (°C)
     # p = sea pressure (dbar) (here using 0 pressure to get potential density
-    # TODO: CHECK IF THIS IS CORRECT
-
-    # Some parameter values
-    ρ = 1035.0    # kg/m^3
-    # Alternatively, rebuild density from thetao, so, and depth as approximate pressure
-    ZBOT3D = cumsum(thkcello, dims = 3)
-    Z3D = ZBOT3D - 0.5 * thkcello
-    ρ = gsw_rho.(so, ct, Z3D)
 
     # Diffusivites
     κH = 500.0    # m^2/s
@@ -98,15 +96,15 @@
     ϕ = facefluxesfrommasstransport(; umo, vmo)
 
     # Make fuxes from all directions from velocities
-    ϕ_bis = facefluxesfromvelocities(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, ρ)
+    ϕ_bis = facefluxesfromvelocities(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, gridmetrics, ρ)
 
     # Make indices
-    indices = makeindices(modelgrid.v3D)
+    indices = makeindices(gridmetrics.v3D)
 
     @test all(.!isnan.(ρ[indices.wet3D])) == true
 
     # Make transport matrix
-    (; T, Tadv, TκH, TκVML, TκVdeep) = transportmatrix(; ϕ, mlotst, modelgrid, indices, ρ, κH, κVML, κVdeep)
+    (; T, Tadv, TκH, TκVML, TκVdeep) = transportmatrix(; ϕ, mlotst, gridmetrics, indices, ρ, κH, κVML, κVdeep)
 
     Tsyms = (:T, :Tadv, :TκH, :TκVML, :TκVdeep)
 	for Ttest in (T, Tadv, TκH, TκVML, TκVdeep)
@@ -121,34 +119,35 @@ end
     using NaNStatistics
     using GLMakie
 
-    (; modelgrid, indices, ρθ, v3D, lat, lon, zt, uo, vo, uo_lon, uo_lat, vo_lon, vo_lat,
+    (; gridmetrics, indices, ρ, v3D, lat, lon, zt, uo, vo, uo_lon, uo_lat, vo_lon, vo_lat,
     lon_vertices, lat_vertices, indices,
     umo, vmo, umo_lon, umo_lat, vmo_lon, vmo_lat, model, member, outputdir) = LocalBuiltMatrix
 
 
 
     # plot for sanity check
-    begin # plot zonal average
-        ρθ2D = dropdims(nansum(ρθ .* v3D, dims = 1) ./ nansum(v3D, dims = 1), dims = 1)
+    begin # plot zonal average density
+        ρ2D = dropdims(nansum(ρ .* v3D, dims = 1) ./ nansum(v3D, dims = 1), dims = 1)
         fig = Figure()
         ax = Axis(fig[1,1], xlabel = "latitude (°)", ylabel = "depth (m)")
         # levels = 25:0.1:30
         colormap = :viridis
         # co = contourf!(ax, dropdims(maximum(lat |> Array, dims=1), dims=1), zt |> Array, Γ2D; levels, colormap)
-        co = contourf!(ax, dropdims(maximum(lat |> Array, dims=1), dims=1), zt |> Array, ρθ2D; colormap)
-        cb = Colorbar(fig[1, 2], co; label = "Potential density (?)", tellheight = false)
+        co = contourf!(ax, dropdims(maximum(lat |> Array, dims=1), dims=1), zt |> Array, ρ2D; colormap)
+        ρunit = rich("kg m", superscript("−3"))
+        cb = Colorbar(fig[1, 2], co; label = rich("Density (", ρunit, ")"), tellheight = false)
         cb.height = Relative(2/3)
         ylims!(ax, (6000, 0))
-        Label(fig[0,1], text = "$model $member Potential density", tellwidth = false)
+        Label(fig[0,1], text = "$model $member Density", tellwidth = false)
         fig
     end
-    outputfile = joinpath(outputdir, "potential_density_$model.png")
-    @info "Saving ideal age as image file:\n $(joinpath("test", outputfile))"
+    outputfile = joinpath(outputdir, "rho_$model.png")
+    @info "Saving density zonal average as image file:\n $(joinpath("test", outputfile))"
     save(outputfile, fig)
 
-    κGM = 600 # m^2/s
+    κGM = 500 # m^2/s
     maxslope = 0.01
-    uGM, vGM = OceanTransportMatrixBuilder.bolus_GM_velocity(ρθ, modelgrid; κGM, maxslope)
+    uGM, vGM = OceanTransportMatrixBuilder.bolus_GM_velocity(ρ, gridmetrics, indices; κGM, maxslope)
 
     # Plot location of cell center for volcello, umo, vmo, uo, vo
     fig = Figure()
@@ -161,7 +160,7 @@ end
     text!(ax, vo_lon[1], vo_lat[1]; text="vo (i,j)", align = (:center, :bottom))
     fig
 
-    uo2, uo2_lon, uo2_lat, vo2, vo2_lon, vo2_lat = OceanTransportMatrixBuilder.interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid)
+    uo2, uo2_lon, uo2_lat, vo2, vo2_lon, vo2_lat = OceanTransportMatrixBuilder.interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, gridmetrics)
     fig = Figure(size=(1500, 800))
     ax = Axis(fig[1,1], xlabel = "lon", ylabel = "lat", xgridvisible = false, ygridvisible = false)
     i = 85 .+ (-1:5); j = 2 .+ (-1:4); k = 1
@@ -204,7 +203,7 @@ end
     # unpack transport matrices
     (; T, Tadv, TκH, TκVML, TκVdeep, Tsyms) = LocalBuiltMatrix
     # unpack model grid
-    (; v3D,) = LocalBuiltMatrix.modelgrid
+    (; v3D,) = LocalBuiltMatrix.gridmetrics
     # unpack indices
     (; wet3D, N) = LocalBuiltMatrix.indices
 
@@ -247,10 +246,10 @@ end
     using NaNStatistics
     using GLMakie
 
-    (; modelgrid, indices, T, model, member, outputdir) = LocalBuiltMatrix
+    (; gridmetrics, indices, T, model, member, outputdir) = LocalBuiltMatrix
 
     # unpack model grid
-    (; v3D, lat, zt) = modelgrid
+    (; v3D, lat, zt) = gridmetrics
     # unpack indices
     (; wet3D, N) = indices
 
@@ -348,8 +347,8 @@ end
     end
 
     # Difference between the fluxes from velocities and mass transport
-    (; uo, vo, umo, vmo, uo_lon, uo_lat, vo_lon, vo_lat, modelgrid, ρ) = LocalBuiltMatrix
-    umo_bis, vmo_bis = velocity2fluxes(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, ρ)
+    (; uo, vo, umo, vmo, uo_lon, uo_lat, vo_lon, vo_lat, gridmetrics, ρ) = LocalBuiltMatrix
+    umo_bis, vmo_bis = velocity2fluxes(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, gridmetrics, ρ)
     colorrange = 1e9 .* (-1, 1)
     colormap = cgrad(:RdBu, rev=true)
     Δcolorrange = (-5, 5)

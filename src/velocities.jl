@@ -1,6 +1,6 @@
 
 """
-    velocity2fluxes(u, u_lon, u_lat, v, v_lon, v_lat, modelgrid, ρ)
+    velocity2fluxes(u, u_lon, u_lat, v, v_lon, v_lat, gridmetrics, ρ)
 
 Return the fluxes (integrated over cell faces) given veloticies `u` and `v` and their (lon,lat).
 
@@ -8,16 +8,16 @@ The fluxes are calculated from the density ρ (number or 3D array) and from the 
 The mean density from the two cells that share the face is used.
 The minimum thickness of the two cells that share the face is used.
 """
-function velocity2fluxes(u, u_lon, u_lat, v, v_lon, v_lat, modelgrid, ρ)
+function velocity2fluxes(u, u_lon, u_lat, v, v_lon, v_lat, gridmetrics, ρ)
 
-    # Unpack modelgrid
-    (; thkcello, edge_length_2D, v3D, lon_vertices, lat_vertices, zt) = modelgrid
+    # Unpack gridmetrics
+    (; thkcello, edge_length_2D, v3D, lon_vertices, lat_vertices, zt) = gridmetrics
 
     # make indices
     indices = makeindices(v3D)
 
     # Interpolate to C-grid
-    u, _, _, v, _, _ = interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, modelgrid)
+    u, _, _, v, _, _ = interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, gridmetrics)
 
     # grid type
     gridtopology = getgridtopology(lon_vertices, lat_vertices, zt)
@@ -86,7 +86,7 @@ function facefluxesfrommasstransport(; umo, vmo)
     FillValue = umo.properties["_FillValue"]
     @assert isequal(FillValue, vmo.properties["_FillValue"])
 
-    # Convert to in-memory Array to avoid slow getindex
+    # Convert to in-memory Array to avoid slow getindexornan
     # Convert to Float64 for double-precision mass conservation
     umo = umo |> Array{Float64}
     vmo = vmo |> Array{Float64}
@@ -96,21 +96,21 @@ function facefluxesfrommasstransport(; umo, vmo)
 end
 
 """
-    facefluxesfromvelocities(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, ρ)
+    facefluxesfromvelocities(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, gridmetrics, ρ)
 
 Return the fluxes integrated over each cell face (east, west, north, south, top, bottom)
-given either `uo`, `vo`, their lon/alt locations, and `modelgrid` and `ρ`.
+given either `uo`, `vo`, their lon/alt locations, and `gridmetrics` and `ρ`.
 
 See also `facefluxes`.
 """
-function facefluxesfromvelocities(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, ρ)
+function facefluxesfromvelocities(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, gridmetrics, ρ)
 
     FillValue = uo.properties["_FillValue"]
     @assert isequal(FillValue, vo.properties["_FillValue"])
 
-    # Convert to in-memory Array to avoid slow getindex
+    # Convert to in-memory Array to avoid slow getindexornan
     # Convert to Float64 for double-precision mass conservation
-    umo, vmo = velocity2fluxes(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, ρ)
+    umo, vmo = velocity2fluxes(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, gridmetrics, ρ)
 
     return facefluxes(umo, vmo; FillValue)
 
@@ -173,126 +173,5 @@ function facefluxes(umo, vmo; FillValue)
 end
 
 
-function makemodelgrid(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
-
-	# volume (3D)
-    FillValue = volcello.properties["_FillValue"]
-    v3D = volcello |> Array{Union{Missing, Float64}}
-	v3D = replace(v3D, missing => NaN, 0 => NaN, FillValue => NaN)
-
-    # area (2D)
-    FillValue = areacello.properties["_FillValue"]
-    area2D = areacello |> Array{Union{Missing, Float64}}
-    area2D = replace(area2D, missing => NaN, 0 => NaN, FillValue => NaN)
-
-	# depth and cell height (3D)
-	thkcello = v3D ./ area2D
-	zt = lev |> Array
-
-    lat = lat |> Array
-    lon = lon |> Array
-
-    # same with lon_vertices
-    lon_vertices = lon_vertices |> Array{Float64}
-    lat_vertices = lat_vertices |> Array{Float64}
-
-    # sort the vertices to mathc the default orientation
-    vertexidx = vertexpermutation(lon_vertices, lat_vertices)
-    lon_vertices = lon_vertices[vertexidx,:,:]
-    lat_vertices = lat_vertices[vertexidx,:,:]
-
-    C = CartesianIndices(size(lon))
-
-    dirs = (:south, :east, :north, :west)
-    edge_length_2D = Dict(d=>[verticalfacewidth(lon_vertices, lat_vertices, 𝑖.I[1], 𝑖.I[2], d) for 𝑖 in C] for d in dirs)
-    distance_to_edge_2D = Dict(d=>[centroid2edgedistance(lon, lat, lon_vertices, lat_vertices, 𝑖.I[1], 𝑖.I[2], d) for 𝑖 in C] for d in dirs)
-
-    arakawagrid = getgridtopology(lon_vertices, lat_vertices, zt)
-
-	return (; area2D, v3D, thkcello, lon_vertices, lat_vertices, lon, lat, zt, edge_length_2D, distance_to_edge_2D, arakawagrid)
-end
-
-function makeindices(v3D)
-
-    # LinearIndices and CartesianIndices required for building upwind operator
-    nxyz = size(v3D)
-    L = LinearIndices(nxyz)
-    Lwet = L[.!isnan.(v3D)]
-    N = length(Lwet)
-    wet3D = falses(nxyz...)
-    wet3D[Lwet] .= true
-    Lwet3D = Array{Union{Int, Missing}, 3}(missing, nxyz...)
-    Lwet3D[Lwet] .= 1:length(Lwet)
-    C = CartesianIndices(nxyz)
-
-    return (; wet3D, L, Lwet, N, Lwet3D, C)
-end
-
-
-
-# TODO generalized topology detection
-# That is, how do I figure out how the boundaries are connected for other models than ACCESS?
-
-
-# The default orientation is the following:
-#
-#     4 ────┐ 3
-#           │
-#     1 ────┘ 2
-#
-function vertexindices(dir)
-    dir == :south ? (1, 2) :
-    dir == :east ? (2, 3) :
-    dir == :north ? (3, 4) :
-    dir == :west ? (1, 4) :
-    error()
-end
-vertexpoint(vlon, vlat, i, j, vertexidx) = (vlon[vertexidx,i,j], vlat[vertexidx,i,j])
-function verticalfacewidth(vlon, vlat, i, j, dir)
-    a, b = vertexindices(dir)
-    A = vertexpoint(vlon, vlat, i, j, a)
-    B = vertexpoint(vlon, vlat, i, j, b)
-    haversine(A, B)
-end
-verticalfacewidth(edge_length_2D, i, j, dir) = edge_length_2D[dir][i, j]
-
-function verticalfacearea(vlon, vlat, lev_bnds_or_thkcello, i, j, k, dir)
-    height = cellthickness(lev_bnds_or_thkcello, i, j, k)
-    width = verticalfacewidth(vlon, vlat, i, j, dir)
-    height * width
-end
-function verticalfacearea(edge_length_2D, lev_bnds_or_thkcello, i, j, k, dir)
-    height = cellthickness(lev_bnds_or_thkcello, i, j, k)
-    width = verticalfacewidth(edge_length_2D, i, j, dir)
-    height * width
-end
-
-cellthickness(lev_bnds::Matrix, i, j, k) = abs(lev_bnds[2,k] - lev_bnds[1,k])
-cellthickness(thkcello, i, j, k) = thkcello[i, j, k]
-
-
-function centroid2edgedistance(lon, lat, vlon, vlat, i, j, dir)
-    a, b = vertexindices(dir)
-    C = (lon[i, j], lat[i, j])
-    A = vertexpoint(vlon, vlat, i, j, a)
-    B = vertexpoint(vlon, vlat, i, j, b)
-    M = midpointonsphere(A, B)
-    haversine(C, M)
-end
-
-function midpointonsphere(A, B)
-    if abs(A[1] - B[1]) < 180
-        (A .+ B) ./ 2
-    else # if the edge crosses the longitudinal edge of the map
-        (A .+ B) ./ 2 .+ (180, 0)
-    end
-end
-
-
-function horizontalcentroiddistance(lon, lat, iA, jA, iB, jB)
-    A = (lon[iA, jA], lat[iA, jA])
-    B = (lon[iB, jB], lat[iB, jB])
-    return haversine(A, B)
-end
 
 

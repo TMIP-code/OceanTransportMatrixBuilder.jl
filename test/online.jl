@@ -72,24 +72,24 @@
     κVML = 0.1    # m^2/s
     κVdeep = 1e-5 # m^2/s
 
-    # Make makemodelgrid
-    modelgrid = makemodelgrid(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
+    # Make makegridmetrics
+    gridmetrics = makegridmetrics(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
 
     # Make fuxes from all directions
     ϕ = facefluxesfrommasstransport(; umo, vmo)
 
     # Make fuxes from all directions
-    ϕ_bis = facefluxesfromvelocities(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, modelgrid, ρ)
+    ϕ_bis = facefluxesfromvelocities(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, gridmetrics, ρ)
 
     for dir in (:east, :west, :north, :south, :top, :bottom)
         @test_broken isapprox(getpropery(ϕ, dir), getpropery(ϕ_bis, dir), rtol = 0.1)
     end
 
     # Make indices
-    indices = makeindices(modelgrid.v3D)
+    indices = makeindices(gridmetrics.v3D)
 
     # Make transport matrix
-    (; T, Tadv, TκH, TκVML, TκVdeep) = transportmatrix(; ϕ, mlotst, modelgrid, indices, ρ, κH, κVML, κVdeep)
+    (; T, Tadv, TκH, TκVML, TκVdeep) = transportmatrix(; ϕ, mlotst, gridmetrics, indices, ρ, κH, κVML, κVdeep)
 
     Tsyms = (:T, :Tadv, :TκH, :TκVML, :TκVdeep)
 	for Ttest in (T, Tadv, TκH, TκVML, TκVdeep)
@@ -99,7 +99,7 @@
 	# Check divergence and mass conservation
 
     # unpack model grid
-    (; v3D,) = modelgrid
+    (; v3D,) = gridmetrics
     # unpack indices
     (; wet3D, N) = indices
 	e1 = ones(N)

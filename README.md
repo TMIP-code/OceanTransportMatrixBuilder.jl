@@ -58,10 +58,10 @@ lat_vertices = volcello_ds.lat_verticies # cell vertices
 ϕ = facefluxesfrommasstransport(; umo, vmo)
 
 # Make the required data from grid geometry
-modelgrid = makemodelgrid(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
+gridmetrics = makegridmetrics(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
 
 # Make the indices for going back and forth between 3D and 1D
-indices = makeindices(modelgrid.v3D)
+indices = makeindices(gridmetrics.v3D)
 
 # Some parameter values
 ρ = 1035.0    # density (kg/m^3)
@@ -70,7 +70,7 @@ indices = makeindices(modelgrid.v3D)
 κVdeep = 1e-5 # background vertical diffusivity (m^2/s)
 
 # Make the transport matrix (should take a few seconds)
-(; T) = transportmatrix(; ϕ, mlotst, modelgrid, indices, ρ, κH, κVML, κVdeep)
+(; T) = transportmatrix(; ϕ, mlotst, gridmetrics, indices, ρ, κH, κVML, κVdeep)
 ```
 
 That's it! You've got yourself the transport matrix of your dreams!

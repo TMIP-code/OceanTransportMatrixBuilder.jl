@@ -19,7 +19,7 @@ end
 
 
 """
-    arakawa = getarakawagrid(u_lon, u_lat, v_lon, v_lat, modelgrid)
+    arakawa = getarakawagrid(u_lon, u_lat, v_lon, v_lat, gridmetrics)
 
 Returns the type of the grid (A, B, or C), the grid position of the velocity points,
 and the error of that position relative to the perimeter of the cell.
@@ -49,10 +49,10 @@ The different Arakawa grids recongnized here are:
 where each grid is centered in C.
 Also returns the distances from the velocity points to the grid points.
 """
-function getarakawagrid(u_lon, u_lat, v_lon, v_lat, modelgrid)
+function getarakawagrid(u_lon, u_lat, v_lon, v_lat, gridmetrics)
 
-    # Unpack modelgrid
-    (; lon, lat, lon_vertices, lat_vertices) = modelgrid
+    # Unpack gridmetrics
+    (; lon, lat, lon_vertices, lat_vertices) = gridmetrics
 
     i = j = 1
     u_point = (u_lon[i, j], u_lat[i, j])
@@ -97,17 +97,17 @@ function getarakawagrid(u_lon, u_lat, v_lon, v_lat, modelgrid)
 end
 
 """
-    u, u_lon, u_lat, v, v_lon, v_lat = interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, modelgrid)
+    u, u_lon, u_lat, v, v_lon, v_lat = interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, gridmetrics)
 
 Interpolates the velocity fields `u` and `v` from B- or C-grid
 onto the default C-grid (centered on the cell faces).
 """
-interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, modelgrid) = interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, modelgrid, getarakawagrid(u_lon, u_lat, v_lon, v_lat, modelgrid))
-interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, modelgrid, ::CGridCell) = u, u_lon, u_lat, v, v_lon, v_lat
-interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, modelgrid, ::AGridCell) = error("Interpolation not implemented for A-grid type")
-function interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, modelgrid, arakawa::BGridCell)
+interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, gridmetrics) = interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, gridmetrics, getarakawagrid(u_lon, u_lat, v_lon, v_lat, gridmetrics))
+interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, gridmetrics, ::CGridCell) = u, u_lon, u_lat, v, v_lon, v_lat
+interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, gridmetrics, ::AGridCell) = error("Interpolation not implemented for A-grid type")
+function interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, gridmetrics, arakawagrid::BGridCell)
 
-    (; u_pos, v_pos) = arakawa
+    (; u_pos, v_pos) = arakawagrid
     u_pos == v_pos == :NE || error("Interpolation not implemented for this B-grid($u_pos,$v_pos) type")
 
     _FillValue = u.properties["_FillValue"]
@@ -118,8 +118,8 @@ function interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, modelgrid
 
     nx, ny, nz = size(u)
 
-    # unpack modelgrid
-    (; lon_vertices, lat_vertices) = modelgrid
+    # unpack gridmetrics
+    (; lon_vertices, lat_vertices) = gridmetrics
 
     # It seems that u/v is NaN on boundaries (for ACCESS-ESM1-5)
     # and that umo/vmo were computed as if u/v were 0 on boundaries
@@ -181,3 +181,135 @@ function vertexpermutation(lon_vertices, lat_vertices)
     idx1 = only(setdiff(1:4, idx2, idx3, idx4)) # only in (i,j)
     return [idx1, idx2, idx3, idx4]
 end
+
+
+
+
+# distances
+function horizontaldistance(lon, lat, I, J)
+    I = horizontalindex(I)
+    J = horizontalindex(J)
+    PI = (getindexornan(lon, I), getindexornan(lat, I))
+    PJ = (getindexornan(lon, J), getindexornan(lat, J))
+    return haversine(PI, PJ)
+end
+function verticaldistance(Z::Vector, I, J)
+    I = verticalindex(I)
+    J = verticalindex(J)
+    return abs(getindexornan(Z, J) - getindexornan(Z, I))
+end
+verticaldistance(Z::Array, I, J) = abs(getindexornan(Z, J) - getindexornan(Z, I))
+
+horizontalindex(I::CartesianIndex{2}) = I
+horizontalindex(I::CartesianIndex{3}) = CartesianIndex(I.I[1], I.I[2])
+verticalindex(I::CartesianIndex{1}) = I
+verticalindex(I::CartesianIndex{3}) = CartesianIndex(I.I[3])
+
+
+
+
+# The default orientation is the following:
+#
+#     4 ────┐ 3
+#           │
+#     1 ────┘ 2
+#
+function vertexindices(dir)
+    dir == :south ? (1, 2) :
+    dir == :east ? (2, 3) :
+    dir == :north ? (3, 4) :
+    dir == :west ? (1, 4) :
+    error()
+end
+vertexpoint(vlon, vlat, i, j, vertexidx) = (vlon[vertexidx,i,j], vlat[vertexidx,i,j])
+function verticalfacewidth(vlon, vlat, i, j, dir)
+    a, b = vertexindices(dir)
+    A = vertexpoint(vlon, vlat, i, j, a)
+    B = vertexpoint(vlon, vlat, i, j, b)
+    haversine(A, B)
+end
+verticalfacewidth(edge_length_2D, i, j, dir) = edge_length_2D[dir][i, j]
+
+function verticalfacearea(vlon, vlat, lev_bnds_or_thkcello, i, j, k, dir)
+    height = cellthickness(lev_bnds_or_thkcello, i, j, k)
+    width = verticalfacewidth(vlon, vlat, i, j, dir)
+    height * width
+end
+function verticalfacearea(edge_length_2D, lev_bnds_or_thkcello, i, j, k, dir)
+    height = cellthickness(lev_bnds_or_thkcello, i, j, k)
+    width = verticalfacewidth(edge_length_2D, i, j, dir)
+    height * width
+end
+
+cellthickness(lev_bnds::Matrix, i, j, k) = abs(lev_bnds[2,k] - lev_bnds[1,k])
+cellthickness(thkcello, i, j, k) = thkcello[i, j, k]
+
+
+function centroid2edgedistance(lon, lat, vlon, vlat, i, j, dir)
+    a, b = vertexindices(dir)
+    C = (lon[i, j], lat[i, j])
+    A = vertexpoint(vlon, vlat, i, j, a)
+    B = vertexpoint(vlon, vlat, i, j, b)
+    M = midpointonsphere(A, B)
+    haversine(C, M)
+end
+
+function midpointonsphere(A, B)
+    if abs(A[1] - B[1]) < 180
+        (A .+ B) ./ 2
+    else # if the edge crosses the longitudinal edge of the map
+        (A .+ B) ./ 2 .+ (180, 0)
+    end
+end
+
+
+function horizontalcentroiddistance(lon, lat, iA, jA, iB, jB)
+    A = (lon[iA, jA], lat[iA, jA])
+    B = (lon[iB, jB], lat[iB, jB])
+    return haversine(A, B)
+end
+
+
+
+
+function makegridmetrics(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
+
+	# volume (3D)
+    FillValue = volcello.properties["_FillValue"]
+    v3D = volcello |> Array{Union{Missing, Float64}}
+	v3D = replace(v3D, missing => NaN, 0 => NaN, FillValue => NaN)
+
+    # area (2D)
+    FillValue = areacello.properties["_FillValue"]
+    area2D = areacello |> Array{Union{Missing, Float64}}
+    area2D = replace(area2D, missing => NaN, 0 => NaN, FillValue => NaN)
+
+	# depth and cell height (3D)
+	thkcello = v3D ./ area2D
+    ZBOT3D = cumsum(thkcello, dims = 3)
+    Z3D = ZBOT3D - 0.5 * thkcello
+	zt = lev |> Array
+
+    lat = lat |> Array
+    lon = lon |> Array
+
+    # same with lon_vertices
+    lon_vertices = lon_vertices |> Array{Float64}
+    lat_vertices = lat_vertices |> Array{Float64}
+
+    # sort the vertices to mathc the default orientation
+    vertexidx = vertexpermutation(lon_vertices, lat_vertices)
+    lon_vertices = lon_vertices[vertexidx,:,:]
+    lat_vertices = lat_vertices[vertexidx,:,:]
+
+    C = CartesianIndices(size(lon))
+
+    dirs = (:south, :east, :north, :west)
+    edge_length_2D = Dict(d=>[verticalfacewidth(lon_vertices, lat_vertices, 𝑖.I[1], 𝑖.I[2], d) for 𝑖 in C] for d in dirs)
+    distance_to_edge_2D = Dict(d=>[centroid2edgedistance(lon, lat, lon_vertices, lat_vertices, 𝑖.I[1], 𝑖.I[2], d) for 𝑖 in C] for d in dirs)
+
+    gridtopology = getgridtopology(lon_vertices, lat_vertices, zt)
+
+	return (; area2D, v3D, thkcello, lon_vertices, lat_vertices, lon, lat, Z3D, zt, edge_length_2D, distance_to_edge_2D, gridtopology)
+end
+
