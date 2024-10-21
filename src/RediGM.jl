@@ -65,7 +65,7 @@ function bolus_GM_velocity(ρ, gridmetrics, indices; κGM = 600, maxslope = 0.01
     Sc = 0.004
     Sd = 0.001
     # that should not work since Sᵢ and Sⱼ are not colocated
-    taper = 0.5 * (1 + tanh.((Sc .- sqrt.(Sᵢ .^ 2 + Sⱼ .^ 2)) / Sd))
+    taper = @. 0.5 * (1 + tanh((Sc - sqrt(Sᵢ ^ 2 + Sⱼ ^ 2)) / Sd))
     Sᵢ = taper .* Sᵢ
     Sⱼ = taper .* Sⱼ
 
