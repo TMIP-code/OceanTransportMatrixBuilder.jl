@@ -118,14 +118,23 @@ end
 
 function localtriadderivative(vals::VerticalFaceTriadGroupValues, distances::VerticalFaceTriadGroupDistances)
     Δvals = (
-        (vals.N - vals.C) / distances.CN,
-        (vals.C - vals.S) / distances.CS,
-        (vals.E - vals.C) / distances.CE,
-        (vals.NE - vals.E) / distances.ENE,
-        (vals.E - vals.SE) / distances.ESE,
+        CN = (vals.N - vals.C) / distances.CN,
+        CS = (vals.C - vals.S) / distances.CS,
+        CE = (vals.E - vals.C) / distances.CE,
+        ENE = (vals.NE - vals.E) / distances.ENE,
+        ESE = (vals.E - vals.SE) / distances.ESE,
     )
-    weights = (!isnan(Δval) for Δval in Δvals)
-    return sum(w * Δval for (w, Δval) in zip(weights, Δvals)) / sum(weights)
+
+    ∂Eover∂N = (
+        ECN = Δvals.CE / Δvals.CN,
+        ECS = Δvals.CE / Δvals.CS,
+        CEN = Δvals.CE / Δvals.ENE,
+        CES = Δvals.CE / Δvals.ESE,
+    )
+
+    weights = (;(k => !isnan(v) for (k,v) in pairs(∂Eover∂N))...)
+
+    return sum(w * v for (w, v) in zip(weights, ∂Eover∂N)) / sum(weights)
 end
 function globalverticalfacetriadderivative(χ, gridmetrics, indices, dir)
     (; lon, lat, Z3D, gridtopology) = gridmetrics

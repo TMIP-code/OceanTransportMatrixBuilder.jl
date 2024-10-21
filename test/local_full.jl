@@ -79,7 +79,7 @@
 
     # Below is commented out but should eventually be teseted for neutral/potential density
     # @show nanmean(ct)
-    # ρθ = gsw_rho.(so, ct, 0)
+    ρθ = gsw_rho.(so, ct, 1000)
     # @show nanmean(ρθ)
     # from MATLAB GSW toolbox:
     # gsw_rho.(so, ct, p)
@@ -145,7 +145,7 @@ end
     @info "Saving density zonal average as image file:\n $(joinpath("test", outputfile))"
     save(outputfile, fig)
 
-    κGM = 500 # m^2/s
+    κGM = 600 # m^2/s
     maxslope = 0.01
     uGM, vGM = OceanTransportMatrixBuilder.bolus_GM_velocity(ρ, gridmetrics, indices; κGM, maxslope)
 
