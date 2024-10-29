@@ -297,7 +297,7 @@ function makegridmetrics(; areacello, volcello, lon, lat, lev, lon_vertices, lat
     lon_vertices = lon_vertices |> Array{Float64}
     lat_vertices = lat_vertices |> Array{Float64}
 
-    # sort the vertices to mathc the default orientation
+    # sort the vertices to match the default orientation
     vertexidx = vertexpermutation(lon_vertices, lat_vertices)
     lon_vertices = lon_vertices[vertexidx,:,:]
     lat_vertices = lat_vertices[vertexidx,:,:]
