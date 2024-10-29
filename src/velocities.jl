@@ -74,14 +74,14 @@ Return the nanmin of `a` and `b` (scalars).
 nanmin2(a, b) = isnan(a) ? b : isnan(b) ? a : min(a, b)
 
 """
-    facefluxesfrommasstransport(; umo, vmo)
+    facefluxesfrommasstransport(; umo, vmo, gridmetrics, indices)
 
 Return the fluxes integrated over each cell face (east, west, north, south, top, bottom)
 given mass transport `umo` and `vmo` (fluxes across faces).
 
 See also `facefluxes`.
 """
-function facefluxesfrommasstransport(; umo, vmo)
+function facefluxesfrommasstransport(; umo, vmo, gridmetrics, indices)
 
     FillValue = umo.properties["_FillValue"]
     @assert isequal(FillValue, vmo.properties["_FillValue"])
@@ -91,19 +91,19 @@ function facefluxesfrommasstransport(; umo, vmo)
     umo = umo |> Array{Float64}
     vmo = vmo |> Array{Float64}
 
-    return facefluxes(umo, vmo; FillValue)
+    return facefluxes(umo, vmo, gridmetrics, indices; FillValue)
 
 end
 
 """
-    facefluxesfromvelocities(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, gridmetrics, ρ)
+    facefluxesfromvelocities(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, gridmetrics, indices, ρ)
 
 Return the fluxes integrated over each cell face (east, west, north, south, top, bottom)
 given either `uo`, `vo`, their lon/alt locations, and `gridmetrics` and `ρ`.
 
 See also `facefluxes`.
 """
-function facefluxesfromvelocities(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, gridmetrics, ρ)
+function facefluxesfromvelocities(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, gridmetrics, indices, ρ)
 
     FillValue = uo.properties["_FillValue"]
     @assert isequal(FillValue, vo.properties["_FillValue"])
@@ -112,12 +112,40 @@ function facefluxesfromvelocities(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, grid
     # Convert to Float64 for double-precision mass conservation
     umo, vmo = velocity2fluxes(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, gridmetrics, ρ)
 
-    return facefluxes(umo, vmo; FillValue)
+    return facefluxes(umo, vmo, gridmetrics, indices; FillValue)
+
+end
+
+
+function nofluxboundaries!(ϕᵢ, ϕⱼ, gridmetrics, indices)
+
+
+    # unpack gridmetrics and indices
+    (; C, wet3D) = indices
+    (; gridtopology) = gridmetrics
+
+    for i in eachindex(wet3D)
+
+        E = i₊₁(C[i], gridtopology)
+        N = j₊₁(C[i], gridtopology)
+
+        # If i is land, just enforce zero east and north fluxes
+        !wet3D[i] && (ϕᵢ[i] = ϕⱼ[i] = 0)
+
+        # If eastern neighbor is nothing or land, enforce zero flux in the east direction
+        (isnothing(E) || !wet3D[E]) && (ϕᵢ[i] = 0)
+
+        # If northern neighbor is nothing or land, enforce zero flux in the north direction
+        (isnothing(N) || !wet3D[N]) && (ϕⱼ[i] = 0)
+
+    end
+
+    return ϕᵢ, ϕⱼ
 
 end
 
 """
-    facefluxes(umo, vmo; FillValue)
+    facefluxes(umo, vmo, gridmetrics, indices; FillValue)
 
 Return the fluxes integrated over each cell face (east, west, north, south, top, bottom)
 given the east and north fluxes, `umo` and `vmo`.
@@ -125,21 +153,37 @@ given the east and north fluxes, `umo` and `vmo`.
 The west and south fluxes are computed by simple shift in coordinates.
 The top and bottom fluxes are computed by mass conservation from the seafloor up.
 """
-function facefluxes(umo, vmo; FillValue)
+function facefluxes(umo, vmo, gridmetrics, indices; FillValue)
 
-	iseastborder = isnan.(umo[[2:end;1],:,:]) .& .!isnan.(umo)
-	isnorthborder = isnan.([vmo[:,2:end,:] vmo[end:-1:1,end:end,:]]) .& .!isnan.(vmo)
-	umo[iseastborder] .= 0
-	vmo[isnorthborder] .= 0
+    umo, vmo = nofluxboundaries!(umo, vmo, gridmetrics, indices)
 
-	@info "Making ϕeast and ϕwest"
+    # unpack gridmetrics and indices
+    (; C) = indices
+    (; gridtopology) = gridmetrics
+
+	@info "Making ϕeast"
 	ϕeast = replace(umo, NaN=>0.0, FillValue=>0.0) .|> Float64
-	ϕwest = ϕeast[[end;1:end-1],:,:] .|> Float64
+	@info "Making ϕwest"
+    # ϕwest[i] is ϕeast[west of i]
+    ϕwest = zeros(size(ϕeast))
+    for i in eachindex(ϕwest)
+        W = i₋₁(C[i], gridtopology)
+        isnothing(W) && continue
+        ϕwest[i] = ϕeast[W]
+    end
 
-	@info "Making ϕnorth and ϕsouth"
+	@info "Making ϕnorth"
 	# Check that south pole ϕnorth is zero (so that it causes no issues with circular shift)
 	ϕnorth = replace(vmo, NaN=>0.0, FillValue=>0.0) .|> Float64
-	ϕsouth = ϕnorth[:,[end;1:end-1],:] .|> Float64
+	@info "Making ϕsouth"
+    # ϕsouth[i] is ϕnorth[south of i]
+    # Note from BP: This might break if there is a seam at the South Pole
+	ϕsouth = zeros(size(ϕnorth))
+    for i in eachindex(ϕsouth)
+        S = j₋₁(C[i], gridtopology)
+        isnothing(S) && continue
+        ϕsouth[i] = ϕnorth[S]
+    end
 
 	@info "Making ϕtop and ϕbottom"
 	# Then build ϕtop and ϕbottom from bottom up

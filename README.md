@@ -54,14 +54,14 @@ lat_vertices = volcello_ds.lat_verticies # cell vertices
 # "verticies" name is an xmip bug: https://github.com/jbusecke/xMIP/issues/369
 # (my local data was preprocessed with xmip)
 
-# Make arrays of the flux on each face for each grid cell
-ϕ = facefluxesfrommasstransport(; umo, vmo)
-
 # Make the required data from grid geometry
 gridmetrics = makegridmetrics(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
 
 # Make the indices for going back and forth between 3D and 1D
 indices = makeindices(gridmetrics.v3D)
+
+# Make arrays of the flux on each face for each grid cell
+ϕ = facefluxesfrommasstransport(; umo, vmo, gridmetrics, indices)
 
 # Some parameter values
 ρ = 1035.0    # density (kg/m^3)

@@ -75,18 +75,18 @@
     # Make makegridmetrics
     gridmetrics = makegridmetrics(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
 
-    # Make fuxes from all directions
-    ϕ = facefluxesfrommasstransport(; umo, vmo)
+    # Make indices
+    indices = makeindices(gridmetrics.v3D)
 
     # Make fuxes from all directions
-    ϕ_bis = facefluxesfromvelocities(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, gridmetrics, ρ)
+    ϕ = facefluxesfrommasstransport(; umo, vmo, gridmetrics, indices)
+
+    # Make fuxes from all directions
+    ϕ_bis = facefluxesfromvelocities(; uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, gridmetrics, indices, ρ)
 
     for dir in (:east, :west, :north, :south, :top, :bottom)
         @test_broken isapprox(getpropery(ϕ, dir), getpropery(ϕ_bis, dir), rtol = 0.1)
     end
-
-    # Make indices
-    indices = makeindices(gridmetrics.v3D)
 
     # Make transport matrix
     (; T, Tadv, TκH, TκVML, TκVdeep) = transportmatrix(; ϕ, mlotst, gridmetrics, indices, ρ, κH, κVML, κVdeep)
