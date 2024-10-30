@@ -161,9 +161,9 @@ function facefluxes(umo, vmo, gridmetrics, indices; FillValue)
     (; C) = indices
     (; gridtopology) = gridmetrics
 
-	@info "Making ϕeast"
+	@debug "Making ϕeast"
 	ϕeast = replace(umo, NaN=>0.0, FillValue=>0.0) .|> Float64
-	@info "Making ϕwest"
+	@debug "Making ϕwest"
     # ϕwest[i] is ϕeast[west of i]
     ϕwest = zeros(size(ϕeast))
     for i in eachindex(ϕwest)
@@ -172,10 +172,10 @@ function facefluxes(umo, vmo, gridmetrics, indices; FillValue)
         ϕwest[i] = ϕeast[W]
     end
 
-	@info "Making ϕnorth"
+	@debug "Making ϕnorth"
 	# Check that south pole ϕnorth is zero (so that it causes no issues with circular shift)
 	ϕnorth = replace(vmo, NaN=>0.0, FillValue=>0.0) .|> Float64
-	@info "Making ϕsouth"
+	@debug "Making ϕsouth"
     # ϕsouth[i] is ϕnorth[south of i]
     # Note from BP: This might break if there is a seam at the South Pole
 	ϕsouth = zeros(size(ϕnorth))
@@ -185,7 +185,7 @@ function facefluxes(umo, vmo, gridmetrics, indices; FillValue)
         ϕsouth[i] = ϕnorth[S]
     end
 
-	@info "Making ϕtop and ϕbottom"
+	@debug "Making ϕtop and ϕbottom"
 	# Then build ϕtop and ϕbottom from bottom up
 	# Mass conservation implies that
 	# 	ϕwest + ϕsouth + ϕbottom - ϕeast - ϕnorth - ϕtop = 0

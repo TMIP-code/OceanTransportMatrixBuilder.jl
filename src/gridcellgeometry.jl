@@ -193,6 +193,7 @@ function horizontaldistance(lon, lat, I, J)
     PJ = (getindexornan(lon, J), getindexornan(lat, J))
     return haversine(PI, PJ)
 end
+horizontaldistance(lon, lat, I, ::Nothing) = NaN
 function verticaldistance(Z::Vector, I, J)
     I = verticalindex(I)
     J = verticalindex(J)
@@ -304,12 +305,14 @@ function makegridmetrics(; areacello, volcello, lon, lat, lev, lon_vertices, lat
 
     C = CartesianIndices(size(lon))
 
-    dirs = (:south, :east, :north, :west)
-    edge_length_2D = Dict(d=>[verticalfacewidth(lon_vertices, lat_vertices, 𝑖.I[1], 𝑖.I[2], d) for 𝑖 in C] for d in dirs)
-    distance_to_edge_2D = Dict(d=>[centroid2edgedistance(lon, lat, lon_vertices, lat_vertices, 𝑖.I[1], 𝑖.I[2], d) for 𝑖 in C] for d in dirs)
-
     gridtopology = getgridtopology(lon_vertices, lat_vertices, zt)
 
-	return (; area2D, v3D, thkcello, lon_vertices, lat_vertices, lon, lat, Z3D, zt, edge_length_2D, distance_to_edge_2D, gridtopology)
+    dirs = (:south, :east, :north, :west)
+    𝑗s = (j₋₁, i₊₁, j₊₁, i₋₁)
+    edge_length_2D = Dict(d=>[verticalfacewidth(lon_vertices, lat_vertices, 𝑖.I[1], 𝑖.I[2], d) for 𝑖 in C] for d in dirs)
+    distance_to_edge_2D = Dict(d=>[centroid2edgedistance(lon, lat, lon_vertices, lat_vertices, 𝑖.I[1], 𝑖.I[2], d) for 𝑖 in C] for d in dirs)
+    distance_to_neighbour_2D = Dict(d=>[horizontaldistance(lon, lat, 𝑖, 𝑗(𝑖, gridtopology)) for 𝑖 in C] for (d,𝑗) in zip(dirs,𝑗s))
+
+	return (; area2D, v3D, thkcello, lon_vertices, lat_vertices, lon, lat, Z3D, zt, edge_length_2D, distance_to_edge_2D, distance_to_neighbour_2D, gridtopology)
 end
 

@@ -32,7 +32,7 @@ Build the advection operator Tadv.
 function buildTadv(; ϕ, gridmetrics, indices, ρ)
     # default ρ = 1035 kg/m^3 is the value originally used by Chamberlain et al. (2019)
 
-	@info "Building Tadv"
+	@debug "Building Tadv"
 	𝑖s, 𝑗s, Tvals = upwind_advection_operator_sparse_entries(ϕ, gridmetrics, indices, ρ)
 
     N = indices.N
@@ -56,7 +56,7 @@ function buildTκH(; gridmetrics, indices, ρ, κH)
     # Wet mask for horizontal diffusivity
 	ΩH = trues(N)
 
-	@info "Building TκH"
+	@debug "Building TκH"
 	𝑖s, 𝑗s, Tvals = horizontal_diffusion_operator_sparse_entries(; gridmetrics, indices, κH, ΩH)
 
 	any(isnan.(Tvals)) && error("TκH contains NaNs.")
@@ -85,7 +85,7 @@ function buildTκVML(; mlotst, gridmetrics, indices, κVML)
 	# Wet mask for mixed layer diffusivity
 	Ω = replace(reshape(zt, 1, 1, length(zt)) .< mlotst, missing=>false)[Lwet]
 
-	@info "Building TκVML "
+	@debug "Building TκVML "
 	𝑖s, 𝑗s, Tvals = vertical_diffusion_operator_sparse_entries(; gridmetrics, indices, κV = κVML, Ω)
 
 	any(isnan.(Tvals)) && error("TκVML contains NaNs.")
@@ -108,7 +108,7 @@ function buildTκVdeep(; mlotst, gridmetrics, indices, κVdeep)
 	# Deep mask for vertical diffusivity
 	Ω = trues(N) # TODO (maybe): make Ωdeep not overlap with ΩML at MLD?
 
-	@info "Building TκVdeep"
+	@debug "Building TκVdeep"
 	𝑖s, 𝑗s, Tvals = vertical_diffusion_operator_sparse_entries(; gridmetrics, indices, κV = κVdeep, Ω)
 
 	any(isnan.(Tvals)) && error("TκVdeep contains NaNs.")
@@ -129,15 +129,20 @@ function transportmatrix(; ϕ, mlotst, gridmetrics, indices, ρ,
 		κH = 500.0, # m^2/s,
 		κVML = 0.1, # m^2/s,
 		κVdeep = 1e-5, # m^2/s,
-		Tadv = buildTadv(; ϕ, gridmetrics, indices, ρ),
-		TκH = buildTκH(; gridmetrics, indices, ρ, κH),
-		TκVML = buildTκVML(; mlotst, gridmetrics, indices, κVML),
-		TκVdeep = buildTκVdeep(; mlotst, gridmetrics, indices, κVdeep),
+		Tadv = nothing,
+		TκH = nothing,
+		TκVML = nothing,
+		TκVdeep = nothing,
 	)
 
-	@info "Building T"
+	isnothing(Tadv) && (Tadv = buildTadv(; ϕ, gridmetrics, indices, ρ))
+	isnothing(TκH) && (TκH = buildTκH(; gridmetrics, indices, ρ, κH))
+	isnothing(TκVML) && (TκVML = buildTκVML(; mlotst, gridmetrics, indices, κVML))
+	isnothing(TκVdeep) && (TκVdeep = buildTκVdeep(; mlotst, gridmetrics, indices, κVdeep))
 
-	@time T = Tadv + TκH + TκVML + TκVdeep
+	@debug "Building T"
+
+	T = Tadv + TκH + TκVML + TκVdeep
 
 	return (; T, Tadv, TκH, TκVML, TκVdeep)
 end
@@ -145,7 +150,15 @@ end
 
 
 
-
+function preallocate_sparse_entries(sizehint)
+	𝑖s = Int64[]
+	𝑗s = Int64[]
+	Tvals = Float64[]
+	sizehint!(𝑖s, sizehint)
+	sizehint!(𝑗s, sizehint)
+	sizehint!(Tvals, sizehint)
+	return 𝑖s, 𝑗s, Tvals
+end
 
 # Some personal notes
 # ϕ are water mass transports, in kg/s
@@ -184,13 +197,13 @@ function upwind_advection_operator_sparse_entries(ϕ, gridmetrics, indices, ρ)
     # Unpack model grid
     (; v3D, gridtopology) = gridmetrics
     # Unpack indices
-    (; Lwet, Lwet3D, C) = indices
+    (; Lwet, Lwet3D, C, N) = indices
 
-	any(isnan.(ρ[Lwet])) && error("ρ contains NaNs")
+	any(isnan, ρ[Lwet]) && error("ρ contains NaNs")
 
-	𝑖s, 𝑗s, Tvals = Int[], Int[], Float64[]
+	𝑖s, 𝑗s, Tvals = preallocate_sparse_entries(6N) # 6 directions for upwind advection
 
-    @time for 𝑖 in eachindex(Lwet)
+    for 𝑖 in eachindex(Lwet)
 		L𝑖 = Lwet[𝑖]
 		C𝑖 = C[L𝑖]
 		i, j, k = C𝑖.I
@@ -315,18 +328,19 @@ Return the sparse (i, j, v) for the horizontal diffusion operator TκH.
 function horizontal_diffusion_operator_sparse_entries(; gridmetrics, indices, κH, ΩH)
 
     # Unpack model grid
-    (; v3D, edge_length_2D, lon, lat, thkcello, gridtopology) = gridmetrics
+    (; v3D, edge_length_2D, lon, lat, thkcello, gridtopology, distance_to_neighbour_2D) = gridmetrics
     # Unpack indices
-    (; wet3D, Lwet, Lwet3D, C) = indices
+    (; wet3D, Lwet, Lwet3D, C, N) = indices
 
-	𝑖s, 𝑗s, Tvals = Int[], Int[], Float64[]
+	𝑖s, 𝑗s, Tvals = preallocate_sparse_entries(8N) # 2 × 4 directions for horizontal diffusion
 
     ny = size(wet3D, 2) # Should not be needed once oppdir is dealt by topology functions
 
-    @time for 𝑖 in eachindex(Lwet)
+    for 𝑖 in eachindex(Lwet)
         ΩH[𝑖] || continue # only continue if inside ΩH
 		L𝑖 = Lwet[𝑖]
 		C𝑖 = C[L𝑖]
+		C𝑖srf = horizontalindex(C𝑖)
 		i, j, k = C𝑖.I
 		V = v3D[C𝑖]
 		# From West
@@ -340,8 +354,7 @@ function horizontal_diffusion_operator_sparse_entries(; gridmetrics, indices, κ
 				aij = verticalfacearea(edge_length_2D, thkcello, i, j, k, :west)
 				aji = verticalfacearea(edge_length_2D, thkcello, iW, jW, k, :east)
 				a = min(aij, aji)
-				# I take the mean distance from both dirs
-				d = horizontalcentroiddistance(lon, lat, i, j, iW, jW)
+				d = distance_to_neighbour_2D[:west][C𝑖srf]
 				pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗W, κH, a, d, V)
 			end
 		end
@@ -355,7 +368,7 @@ function horizontal_diffusion_operator_sparse_entries(; gridmetrics, indices, κ
 				aij = verticalfacearea(edge_length_2D, thkcello, i, j, k, :east)
 				aji = verticalfacearea(edge_length_2D, thkcello, iE, jE, k, :west)
 				a = min(aij, aji)
-				d = horizontalcentroiddistance(lon, lat, i, j, iE, jE)
+				d = distance_to_neighbour_2D[:east][C𝑖srf]
 				pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗E, κH, a, d, V)
 			end
 		end
@@ -369,7 +382,7 @@ function horizontal_diffusion_operator_sparse_entries(; gridmetrics, indices, κ
 				aij = verticalfacearea(edge_length_2D, thkcello, i, j, k, :south)
 				aji = verticalfacearea(edge_length_2D, thkcello, iS, jS, k, :north)
 				a = min(aij, aji)
-				d = horizontalcentroiddistance(lon, lat, i, j, iS, jS)
+				d = distance_to_neighbour_2D[:south][C𝑖srf]
 				pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗S, κH, a, d, V)
 			end
 		end
@@ -386,7 +399,7 @@ function horizontal_diffusion_operator_sparse_entries(; gridmetrics, indices, κ
 				aij = verticalfacearea(edge_length_2D, thkcello, i, j, k, :north)
 				aji = verticalfacearea(edge_length_2D, thkcello, iN, jN, k, oppdir)
 				a = min(aij, aji)
-				d = horizontalcentroiddistance(lon, lat, i, j, iN, jN)
+				d = distance_to_neighbour_2D[:north][C𝑖srf]
 				pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗N, κH, a, d, V)
 			end
         end
@@ -403,10 +416,6 @@ Pushes the sparse indices and values into (𝑖s, 𝑗s, Tvals) corresponding to
 """
 function pushTmixingvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, κ, a, d, V)
 	Tval = κ * a / (d * V)
-    if d == 0 || V == 0 || isnan(Tval)
-        @show 𝑖, 𝑗, κ, a, d, V
-        error()
-    end
     push!(𝑖s, 𝑖)
 	push!(𝑗s, 𝑖)
 	push!(Tvals, Tval)
@@ -424,13 +433,14 @@ function vertical_diffusion_operator_sparse_entries(; gridmetrics, indices, κV,
     # Unpack model grid
     (; v3D, area2D, zt, gridtopology) = gridmetrics
     # Unpack indices
-    (; wet3D, Lwet, Lwet3D, C) = indices
+    (; wet3D, Lwet, Lwet3D, C, N) = indices
 
-    𝑖s, 𝑗s, Tvals = Int[], Int[], Float64[]
+	𝑖s, 𝑗s, Tvals = preallocate_sparse_entries(4 * N) # 2 × 2 directions for vertical diffusion
+
 	nxyz = size(wet3D)
     _, _, nz = nxyz
 
-    @time for 𝑖 in eachindex(Lwet)
+    for 𝑖 in eachindex(Lwet)
         Ω[𝑖] || continue # only continue if inside Ω
 		L𝑖 = Lwet[𝑖]
 		C𝑖 = C[L𝑖]
