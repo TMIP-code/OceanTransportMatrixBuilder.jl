@@ -161,6 +161,10 @@ function facefluxes(umo, vmo, gridmetrics, indices; FillValue)
     (; C) = indices
     (; gridtopology) = gridmetrics
 
+    # Check that not all values are NaN or FillValue
+    @assert !all(x -> isnan(x) || (x == FillValue), umo)
+    @assert !all(x -> isnan(x) || (x == FillValue), vmo)
+
 	@debug "Making ϕeast"
 	ϕeast = replace(umo, NaN=>0.0, FillValue=>0.0) .|> Float64
 	@debug "Making ϕwest"
