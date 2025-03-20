@@ -9,7 +9,7 @@
     using YAXArrays
     using SparseArrays
     using LinearAlgebra
-    using GLMakie
+    using CairoMakie
     using Unitful
     using Unitful: m, km
 

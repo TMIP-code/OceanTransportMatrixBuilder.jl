@@ -109,5 +109,12 @@
         @test Ttest isa SparseMatrixCSC{Float64, Int}
     end
 
+    # Make transport matrix without upwind this time
+    (; T, Tadv, TκH, TκVML, TκVdeep) = transportmatrix(; ϕ, mlotst, gridmetrics, indices, ρ, κH, κVML, κVdeep, upwind = false)
+
+    Tsyms = (:T, :Tadv, :TκH, :TκVML, :TκVdeep)
+	for Ttest in (T, Tadv, TκH, TκVML, TκVdeep)
+        @test Ttest isa SparseMatrixCSC{Float64, Int}
+    end
 
 end

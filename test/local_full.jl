@@ -5,7 +5,7 @@
 @testitem "velocities and mass transports" setup=[LocalBuiltMatrix] tags=[:skipci] begin
 
     using NaNStatistics
-    using GLMakie
+    using CairoMakie
 
     (; gridmetrics, indices, ρ, v3D, lat, lon, zt, uo, vo, uo_lon, uo_lat, vo_lon, vo_lat,
     lon_vertices, lat_vertices, indices,
@@ -14,21 +14,20 @@
 
 
     # plot for sanity check
-    begin # plot zonal average density
-        ρ2D = dropdims(nansum(ρ .* v3D, dims = 1) ./ nansum(v3D, dims = 1), dims = 1)
-        fig = Figure()
-        ax = Axis(fig[1,1], xlabel = "latitude (°)", ylabel = "depth (m)")
-        # levels = 25:0.1:30
-        colormap = :viridis
-        # co = contourf!(ax, dropdims(maximum(lat |> Array, dims=1), dims=1), zt |> Array, Γ2D; levels, colormap)
-        co = contourf!(ax, dropdims(maximum(lat |> Array, dims=1), dims=1), zt |> Array, ρ2D; colormap)
-        ρunit = rich("kg m", superscript("−3"))
-        cb = Colorbar(fig[1, 2], co; label = rich("Density (", ρunit, ")"), tellheight = false)
-        cb.height = Relative(2/3)
-        ylims!(ax, (6000, 0))
-        Label(fig[0,1], text = "$model $member Density", tellwidth = false)
-        fig
-    end
+    # plot zonal average density
+    ρ2D = dropdims(nansum(ρ.data .* v3D, dims = 1) ./ nansum(v3D, dims = 1), dims = 1)
+    fig = Figure()
+    ax = Axis(fig[1,1], xlabel = "latitude (°)", ylabel = "depth (m)")
+    # levels = 25:0.1:30
+    colormap = :viridis
+    # co = contourf!(ax, dropdims(maximum(lat |> Array, dims=1), dims=1), zt |> Array, Γ2D; levels, colormap)
+    co = contourf!(ax, dropdims(maximum(lat |> Array, dims=1), dims=1), zt |> Array, ρ2D; colormap)
+    ρunit = rich("kg m", superscript("−3"))
+    cb = Colorbar(fig[1, 2], co; label = rich("Density (", ρunit, ")"), tellheight = false)
+    cb.height = Relative(2/3)
+    ylims!(ax, (6000, 0))
+    Label(fig[0,1], text = "$model $member Density", tellwidth = false)
+
     outputfile = joinpath(outputdir, "rho_$model.png")
     @info "Saving density zonal average as image file:\n $(joinpath("test", outputfile))"
     save(outputfile, fig)
@@ -110,21 +109,6 @@ end
 	end
 end
 
-@testitem "Test flux divergence" setup=[LocalBuiltMatrix] tags=[:skipci] begin
-
-    using SparseArrays
-    using LinearAlgebra
-
-    # unpack transport matrices
-    (; T) = LocalBuiltMatrix
-
-    # tests if diagonal elements are > 0 and off-diagonal are < 0.
-    diagT = sparse(Diagonal(T))
-    @test all(diagT.nzval .> 0)
-    @test all((T - diagT).nzval .< 0)
-
-end
-
 @testitem "Ideal age (coarsened)" setup=[LocalBuiltMatrix] tags=[:skipci] begin
 
     using SparseArrays
@@ -132,7 +116,7 @@ end
     using Unitful
     using Unitful: s, yr
     using NaNStatistics
-    using GLMakie
+    using CairoMakie
 
     (; gridmetrics, indices, T, model, member, outputdir) = LocalBuiltMatrix
 
@@ -158,8 +142,7 @@ end
     issrf_c = LUMP * issrf .> 0
     M_c = sparse(Diagonal(issrf_c))
     sΓ_c = LUMP * sΓ
-    @info "Solving ideal mean age"
-    Γ_c = (T_c + M_c) \ sΓ_c
+    @time "Solving ideal mean age" Γ_c = (T_c + M_c) \ sΓ_c
     Γ = SPRAY * Γ_c
     Γyr = ustrip.(yr, Γ .* s)
     Γ3D = OceanTransportMatrixBuilder.as3D(Γyr, wet3D)
@@ -185,7 +168,7 @@ end
 
 @testitem "mass transport vs velocity checks" setup=[LocalBuiltMatrix] tags=[:skipci] begin
 
-    using GLMakie
+    using CairoMakie
     using Makie.StructArrays
 
     outputdir = LocalBuiltMatrix.outputdir

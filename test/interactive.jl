@@ -108,6 +108,14 @@ indices = makeindices(gridmetrics.v3D)
 # Make transport matrix
 (; T, Tadv, TκH, TκVML, TκVdeep) = transportmatrix(; ϕ, mlotst, gridmetrics, indices, ρ, κH, κVML, κVdeep)
 
-@profview transportmatrix(; ϕ, mlotst, gridmetrics, indices, ρ, κH, κVML, κVdeep)
+Tsyms = (:T, :Tadv, :TκH, :TκVML, :TκVdeep)
+for Ttest in (T, Tadv, TκH, TκVML, TκVdeep)
+    @test Ttest isa SparseMatrixCSC{Float64, Int}
+end
 
-@profview_allocs transportmatrix(; ϕ, mlotst, gridmetrics, indices, ρ, κH, κVML, κVdeep) sample_rate=0.9
+# Make transport matrix without upwind this time
+(; T, Tadv, TκH, TκVML, TκVdeep) = transportmatrix(; ϕ, mlotst, gridmetrics, indices, ρ, κH, κVML, κVdeep, upwind = false)
+
+
+# @profview transportmatrix(; ϕ, mlotst, gridmetrics, indices, ρ, κH, κVML, κVdeep)
+# @profview_allocs transportmatrix(; ϕ, mlotst, gridmetrics, indices, ρ, κH, κVML, κVdeep) sample_rate=0.9

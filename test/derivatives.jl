@@ -1,7 +1,7 @@
 @testitem "derivatives" setup=[LocalBuiltMatrix] tags=[:skipci] begin
 
     using NaNStatistics
-    using GLMakie
+    using CairoMakie
 
     (; gridmetrics, indices, ρ, ρθ, v3D, lat, lon, zt, uo, vo, uo_lon, uo_lat, vo_lon, vo_lat,
     lon_vertices, lat_vertices, indices,
