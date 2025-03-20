@@ -25,15 +25,15 @@ function makeindices(v3D)
 end
 
 """
-    buildTadv(; ϕ, gridmetrics, indices, ρ)
+    buildTadv(; ϕ, gridmetrics, indices, ρ, upwind = true)
 
 Build the advection operator Tadv.
 """
-function buildTadv(; ϕ, gridmetrics, indices, ρ)
+function buildTadv(; ϕ, gridmetrics, indices, ρ, upwind = true)
     # default ρ = 1035 kg/m^3 is the value originally used by Chamberlain et al. (2019)
 
 	@debug "Building Tadv"
-	𝑖s, 𝑗s, Tvals = upwind_advection_operator_sparse_entries(ϕ, gridmetrics, indices, ρ)
+	𝑖s, 𝑗s, Tvals = advection_operator_sparse_entries(ϕ, gridmetrics, indices, ρ; upwind)
 
     N = indices.N
 
@@ -105,8 +105,9 @@ function buildTκVdeep(; mlotst, gridmetrics, indices, κVdeep)
 
     N = indices.N
 
-	# Deep mask for vertical diffusivity
-	Ω = trues(N) # TODO (maybe): make Ωdeep not overlap with ΩML at MLD?
+	# κVdeep is a bit of a misnomer: It should be κVBG for "background".
+	# And its mask is entire ocean, naturally.
+	Ω = trues(N)
 
 	@debug "Building TκVdeep"
 	𝑖s, 𝑗s, Tvals = vertical_diffusion_operator_sparse_entries(; gridmetrics, indices, κV = κVdeep, Ω)
@@ -120,7 +121,7 @@ function buildTκVdeep(; mlotst, gridmetrics, indices, κVdeep)
 end
 
 """
-    transportmatrix(; ϕ, mlotst, gridmetrics, indices, ρ, κH, κVML, κVdeep, Tadv, TκH, TκVML, TκVdeep)
+    transportmatrix(; ϕ, mlotst, gridmetrics, indices, ρ, κH, κVML, κVdeep, Tadv, TκH, TκVML, TκVdeep, upwind)
 
 Build the transport matrix, i.e., the flux-divergence operator T = Tadv + TκH + TκVML + TκVdeep,
 and check divergence and mass conservation.
@@ -133,9 +134,10 @@ function transportmatrix(; ϕ, mlotst, gridmetrics, indices, ρ,
 		TκH = nothing,
 		TκVML = nothing,
 		TκVdeep = nothing,
+		upwind = true,
 	)
 
-	isnothing(Tadv) && (Tadv = buildTadv(; ϕ, gridmetrics, indices, ρ))
+	isnothing(Tadv) && (Tadv = buildTadv(; ϕ, gridmetrics, indices, ρ, upwind))
 	isnothing(TκH) && (TκH = buildTκH(; gridmetrics, indices, ρ, κH))
 	isnothing(TκVML) && (TκVML = buildTκVML(; mlotst, gridmetrics, indices, κVML))
 	isnothing(TκVdeep) && (TκVdeep = buildTκVdeep(; mlotst, gridmetrics, indices, κVdeep))
@@ -173,100 +175,17 @@ end
 # 	T[i,j] = -ϕ[j→i] / m[i]             units = kg s⁻¹ / kg = s⁻¹
 # and ϕ[j→i] / m[j] should be added to the diagonal T[j,j].
 
-# Is this mass conserving?
-# Only if
-#   v[i] * T[i,i] + v[j] * T[j,i] ≈ 0
-#   = vi ϕ[i→j] / m[i] + vj -ϕ[i→j] / m[j]
-#   = ϕ[i→j] / ρ[i] - ϕ[i→j] / ρ[j]
-# i.e., iff
-#   ρ[i] = ρ[j]
-# So I must use the mean density between facing cells.
-
-"""
-    upwind_advection_operator_sparse_entries(ϕ, gridmetrics, indices, ρ)
-
-Return the sparse (i, j, v) for the upwind advection operator Tadv.
-"""
-function upwind_advection_operator_sparse_entries(ϕ, gridmetrics, indices, ρ::Number)
-	# If ρ is a scalar, broadcast it to the gridmetrics size
-	ρ = fill(ρ, size(gridmetrics.v3D))
-	return upwind_advection_operator_sparse_entries(ϕ, gridmetrics, indices, ρ)
-end
-function upwind_advection_operator_sparse_entries(ϕ, gridmetrics, indices, ρ)
-
-    # Unpack model grid
-    (; v3D, gridtopology) = gridmetrics
-    # Unpack indices
-    (; Lwet, Lwet3D, C, N) = indices
-
-	any(isnan, ρ[Lwet]) && error("ρ contains NaNs")
-
-	𝑖s, 𝑗s, Tvals = preallocate_sparse_entries(6N) # 6 directions for upwind advection
-
-    for 𝑖 in eachindex(Lwet)
-		L𝑖 = Lwet[𝑖]
-		C𝑖 = C[L𝑖]
-		i, j, k = C𝑖.I
-		v𝑖 = v3D[C𝑖]
-		ρ𝑖 = ρ[C𝑖]
-		# From West
-		ϕwest = ϕ.west[C𝑖]
-		if ϕwest > 0
-			C𝑗 = i₋₁(C𝑖, gridtopology)
-			𝑗 = Lwet3D[C𝑗]
-			v𝑗 = v3D[C𝑗]
-			ρ𝑗 = ρ[C𝑗]
-			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕwest, ρ𝑖, ρ𝑗, v𝑖, v𝑗)
-		end
-		# From East
-		ϕeast = ϕ.east[C𝑖]
-		if ϕeast < 0
-			C𝑗 = i₊₁(C𝑖, gridtopology)
-			𝑗 = Lwet3D[C𝑗]
-			v𝑗 = v3D[C𝑗]
-			ρ𝑗 = ρ[C𝑗]
-			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, -ϕeast, ρ𝑖, ρ𝑗, v𝑖, v𝑗)
-		end
-		# From South
-		ϕsouth = ϕ.south[C𝑖]
-		if ϕsouth > 0
-			C𝑗 = j₋₁(C𝑖, gridtopology)
-			𝑗 = Lwet3D[C𝑗]
-			v𝑗 = v3D[C𝑗]
-			ρ𝑗 = ρ[C𝑗]
-			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕsouth, ρ𝑖, ρ𝑗, v𝑖, v𝑗)
-		end
-		# From North (Special case with north bipole)
-		ϕnorth = ϕ.north[C𝑖]
-		if ϕnorth < 0
-			C𝑗 = j₊₁(C𝑖, gridtopology)
-			𝑗 = Lwet3D[C𝑗]
-			v𝑗 = v3D[C𝑗]
-			ρ𝑗 = ρ[C𝑗]
-			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, -ϕnorth, ρ𝑖, ρ𝑗, v𝑖, v𝑗)
-		end
-		# From Bottom
-		ϕbottom = ϕ.bottom[C𝑖]
-		if ϕbottom > 0
-			C𝑗 = k₊₁(C𝑖, gridtopology)
-			𝑗 = Lwet3D[C𝑗]
-			v𝑗 = v3D[C𝑗]
-			ρ𝑗 = ρ[C𝑗]
-			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕbottom, ρ𝑖, ρ𝑗, v𝑖, v𝑗)
-		end
-		# From Top
-		ϕtop = ϕ.top[C𝑖]
-		if ϕtop < 0 && k > 1 # Evaporation/precipitation -> no change to χ
-			C𝑗 = k₋₁(C𝑖, gridtopology)
-			𝑗 = Lwet3D[C𝑗]
-			v𝑗 = v3D[C𝑗]
-			ρ𝑗 = ρ[C𝑗]
-			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, -ϕtop, ρ𝑖, ρ𝑗, v𝑖, v𝑗)
-		end
-	end
-	return 𝑖s, 𝑗s, Tvals
-end
-
+# For a centered scheme, where the concentration on the cell face is used,
+# I still have the matrix operating as
+# 	∂χ[i] = -T[i,j] * χ[j]    units:   1/s * mol/kg (or mol/m^3)
+# But the centered mass transfer is (regardless of the sign of ϕ)
+# 	∂χ[i] = ϕ[j→i] * (χ[j] + χ[i]) / 2m[i]     units    kg[j]/s * mol/kg[j] / kg[i] = mol/kg[i]
+# and should also incur the opposite mass tendency at j:
+# 	∂χ[j] = -ϕ[j→i] * (χ[j] + χ[i]) / 2m[j]     units    kg[j]/s * mol/kg[j] / kg[j] = mol/kg[j]
+# Thus the matrix term should be constructed as
+# 	T[i,j] = -ϕ[j→i] / 2m[i]             units = kg s⁻¹ / kg = s⁻¹
+# and ϕ[j→i] / 2m[j] should be added to the diagonal T[j,j].
+# So essentially just divide ϕ by 2 compared to upwind, but don't branch on the sign of ϕ.
 
 """
     pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕ, ρ𝑖, ρ𝑗, v𝑖, v𝑗)
@@ -284,6 +203,102 @@ function pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕ, ρ𝑖, ρ�
 	push!(𝑗s, 𝑗)
 	push!(Tvals, ϕ / m𝑗)
 end
+
+
+# Is this mass conserving?
+# Only if
+#   v[i] * T[i,i] + v[j] * T[j,i] ≈ 0
+#   = vi ϕ[i→j] / m[i] + vj -ϕ[i→j] / m[j]
+#   = ϕ[i→j] / ρ[i] - ϕ[i→j] / ρ[j]
+# i.e., iff
+#   ρ[i] = ρ[j]
+# So I must use the mean density between facing cells.
+
+"""
+    advection_operator_sparse_entries(ϕ, gridmetrics, indices, ρ; upwind = true)
+
+Return the sparse (i, j, v) for the upwind advection operator Tadv.
+"""
+function advection_operator_sparse_entries(ϕ, gridmetrics, indices, ρ::Number; upwind = true)
+	# If ρ is a scalar, broadcast it to the gridmetrics size
+	ρ = fill(ρ, size(gridmetrics.v3D))
+	return advection_operator_sparse_entries(ϕ, gridmetrics, indices, ρ; upwind)
+end
+function advection_operator_sparse_entries(ϕ, gridmetrics, indices, ρ; upwind = true)
+
+    # Unpack model grid
+    (; v3D, gridtopology) = gridmetrics
+    # Unpack indices
+    (; Lwet, Lwet3D, C, N) = indices
+
+	any(isnan, ρ[Lwet]) && error("ρ contains NaNs")
+
+	𝑖s, 𝑗s, Tvals = preallocate_sparse_entries(6N) # 6 directions for upwind advection
+
+    for 𝑖 in eachindex(Lwet)
+		L𝑖 = Lwet[𝑖]
+		C𝑖 = C[L𝑖]
+		i, j, k = C𝑖.I
+		v𝑖 = v3D[C𝑖]
+		ρ𝑖 = ρ[C𝑖]
+		# From West
+		ϕwest = upwind ? max(ϕ.west[C𝑖], 0) : ϕ.west[C𝑖] / 2
+		if (ϕwest > 0) || (ϕwest < 0)
+			C𝑗 = i₋₁(C𝑖, gridtopology)
+			𝑗 = Lwet3D[C𝑗]
+			v𝑗 = v3D[C𝑗]
+			ρ𝑗 = ρ[C𝑗]
+			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕwest, ρ𝑖, ρ𝑗, v𝑖, v𝑗)
+		end
+		# From East
+		ϕeast = upwind ? min(ϕ.east[C𝑖], 0) : ϕ.east[C𝑖] / 2
+		if (ϕeast > 0) || (ϕeast < 0)
+			C𝑗 = i₊₁(C𝑖, gridtopology)
+			𝑗 = Lwet3D[C𝑗]
+			v𝑗 = v3D[C𝑗]
+			ρ𝑗 = ρ[C𝑗]
+			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, -ϕeast, ρ𝑖, ρ𝑗, v𝑖, v𝑗)
+		end
+		# From South
+		ϕsouth = upwind ? max(ϕ.south[C𝑖], 0) : ϕ.south[C𝑖] / 2
+		if (ϕsouth > 0) || (ϕsouth < 0)
+			C𝑗 = j₋₁(C𝑖, gridtopology)
+			𝑗 = Lwet3D[C𝑗]
+			v𝑗 = v3D[C𝑗]
+			ρ𝑗 = ρ[C𝑗]
+			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕsouth, ρ𝑖, ρ𝑗, v𝑖, v𝑗)
+		end
+		# From North (Special case with north bipole)
+		ϕnorth = upwind ? min(ϕ.north[C𝑖], 0) : ϕ.north[C𝑖] / 2
+		if (ϕnorth > 0) || (ϕnorth < 0)
+			C𝑗 = j₊₁(C𝑖, gridtopology)
+			𝑗 = Lwet3D[C𝑗]
+			v𝑗 = v3D[C𝑗]
+			ρ𝑗 = ρ[C𝑗]
+			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, -ϕnorth, ρ𝑖, ρ𝑗, v𝑖, v𝑗)
+		end
+		# From Bottom
+		ϕbottom = upwind ? max(ϕ.bottom[C𝑖], 0) : ϕ.bottom[C𝑖] / 2
+		if (ϕbottom > 0) || (ϕbottom < 0)
+			C𝑗 = k₊₁(C𝑖, gridtopology)
+			𝑗 = Lwet3D[C𝑗]
+			v𝑗 = v3D[C𝑗]
+			ρ𝑗 = ρ[C𝑗]
+			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, ϕbottom, ρ𝑖, ρ𝑗, v𝑖, v𝑗)
+		end
+		# From Top
+		ϕtop = upwind ? min(ϕ.top[C𝑖], 0) : ϕ.top[C𝑖] / 2
+		if (k > 1) && ((ϕtop > 0) || (ϕtop < 0)) # Evaporation/precipitation -> no change to χ
+			C𝑗 = k₋₁(C𝑖, gridtopology)
+			𝑗 = Lwet3D[C𝑗]
+			v𝑗 = v3D[C𝑗]
+			ρ𝑗 = ρ[C𝑗]
+			pushTadvectionvalues!(𝑖s, 𝑗s, Tvals, 𝑖, 𝑗, -ϕtop, ρ𝑖, ρ𝑗, v𝑖, v𝑗)
+		end
+	end
+	return 𝑖s, 𝑗s, Tvals
+end
+
 
 
 
