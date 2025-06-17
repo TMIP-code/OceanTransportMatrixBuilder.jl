@@ -97,21 +97,26 @@ ACCESS-CM2
 
 
 
-This code is © Benoît Pasquier (2024) and contributors, and it is made available under the MIT license enclosed with the software.
+This code is © Benoît Pasquier (2025) and contributors, and it is made available under the MIT license enclosed with the software.
 
 Over and above the legal restrictions imposed by this license, if you use this software for an academic publication then you are obliged to provide proper attribution.
 This can be to this code directly,
 
-> Benoît Pasquier (2024) “OceanTransportMatrixBuilder.jl: A Julia package to build ocean transport matrices from CMIP model output”. Zenodo. doi: 10.5281/zenodo.13864524.
+> Benoît Pasquier (2025). OceanTransportMatrixBuilder.jl: A Julia package to build ocean transport matrices from CMIP model output. Zenodo. doi: [10.5281/zenodo.13864392](https://doi.org/10.5281/zenodo.13864392).
 
-or to the paper (currently in preparation) that describes it, or (ideally) both.
+or to the paper that it was developed for (currently under review for publication in *Geophysical Research Letters*),
+
+> Benoît Pasquier, Richard J. Matear, Matthew A. Chamberlain, Tilo Ziehn, David K. Hutchinson, Francois W. Primeau, Yi Liu, and Ann Bardin (2025). The sequestration efficiency of the deep ocean. ESS Open Archive. doi: [10.22541/essoar.174646362.20144320/v1](https://doi.org/10.22541/essoar.174646362.20144320/v1)
+
+or (ideally) both.
 You can also find the citation(s) in BibTeX format in the `CITATION.bib` file.
 
 
 ## Acknowledgements
 
-This package simply implements published work[^Chamberlain_etal_2019], and the Julia code available here was essentially translated from code by Matt Chamberlain at CSIRO.
-Benoît Pasquier (@briochemc) was funded through CSIRO's CarbonLock Future Science Platform, supervised by Richard Matear at CSIRO.
+This package improves on published work[^Chamberlain_etal_2019].
+The original Julia code was essentially translated from code by Matt Chamberlain at CSIRO.
+Benoît Pasquier (@briochemc) acknowledges funding through CSIRO's CarbonLock Future Science Platform, supervised by Richard Matear at CSIRO.
 
 
 
@@ -123,4 +128,4 @@ Benoît Pasquier (@briochemc) was funded through CSIRO's CarbonLock Future Scien
 [^John_et_al_2020]: [John et al. (2020)](10.1016/j.chemgeo.2019.119403) AWESOME OCIM: A simple, flexible, and powerful tool for modeling elemental cycling in the oceans.
 [^DeVries_etal_2012]: [DeVries et al. (2012)](10.1029/2012GL051963) The sequestration efficiency of the biological pump.
 [^Siegel_etal_2021]: [Siegel et al. (2021)](10.1088/1748-9326/ac0be0) Assessing the sequestration time scales of some ocean-based carbon dioxide reduction strategies.
-[^Pasquier_etal_2025]: [Pasquier et al. (submitted to GRL)](https://briochemc.github.io/pdfs/Pasquier_etal_GRL_submitted.pdf) The sequestration efficiency of the deep ocean.
+[^Pasquier_etal_2025]: [Pasquier et al. (2025)](https://doi.org/10.22541/essoar.174646362.20144320/v1) The sequestration efficiency of the deep ocean.
