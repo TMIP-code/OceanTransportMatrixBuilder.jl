@@ -31,7 +31,7 @@ function getgridtopology(lon_vertices, lat_vertices, lev)
     if all(NPlat .== 90)
         return BipolarGridTopology(nx,ny,nz)
     # Otherwise check if the north pole is split in two
-    elseif NPlon == rot180(NPlon) && NPlat == rot180(NPlat)
+    elseif isapprox(NPlon, rot180(NPlon)) && isapprox(NPlat, rot180(NPlat))
         return TripolarGridTopology(nx,ny,nz)
     else
         return UnknownGridTopology(nx,ny,nz)
