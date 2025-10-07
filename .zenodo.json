@@ -6,7 +6,7 @@
     "creators": [
         {
             "orcid": "0000-0002-3838-5976",
-            "affiliation": "Contract Researcher for CSIRO; Adjunct Fellow at the School of Mathematics and Statistics, UNSW, Sydney, AU",
+            "affiliation": "Research Associate, CCRC, UNSW, Sydney, AU",
             "name": "Benoît Pasquier"
         }
     ],
@@ -21,6 +21,12 @@
             "orcid": "0000-0002-3225-0800",
             "affiliation": "CSIRO, Hobart, AU",
             "name": "Richard J. Matear",
+            "type": "Supervisor"
+        },
+        {
+            "orcid": "0000-0002-5068-1591",
+            "affiliation": "CCRC, UNSW, Sydney, AU",
+            "name": "Laurie C. Menviel",
             "type": "Supervisor"
         }
     ],

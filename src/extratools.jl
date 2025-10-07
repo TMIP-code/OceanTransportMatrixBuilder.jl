@@ -1,8 +1,7 @@
 """
-    LUMP, SPRAY = lump_and_spray(wet3D, volume; di=2, dj=2, dk=1)
+    LUMP, SPRAY, v_c = lump_and_spray(wet3D, volume; f=Returns(true),di=2, dj=2, dk=1)
 
-returns the LUMP and SPRAY matrices that go with the
-coarsened grid (also returned).
+returns the LUMP and SPRAY matrices, and the coarsened volume vector.
 
 To get the coarsened vector from fine vector x, use
 
@@ -23,58 +22,43 @@ will lump:
 - every 4 cells in the y direction (lat),
 - and every 1 cell (default) in the z direction (depth).
 
-Expected grid arrangement is OCIM2 like, i.e.,
-lat × lon × depth.
+The optional function argument `f` can be used to specify a region
+where the lumping should occur.
+`f` should be a function of the indices, e.g.,
 
-You can also provide a vector of indices instead of a scalar
-in order to customize the coarsening. For example,
+    f(i,j,k) = lat[i,j] > -40 # only lump north of 40°S
 
-    lump_and_spray(wet3D, volume; di=[1 1 1 1 1 1 1 2 2 2 ... n])
-
-will lump all the boxes in the x dimension that are marked
-with a 1, then all those marked with a 2, and so on.
-Confusing? Let me give a practical example. Say you want to
-coarsen the ACCESS grid in the vertical to match the OCIM grid.
-The you can do
-
-    [~, zidx] = min(abs(ACCESSgrd.zt - OCIMgrd.zt'), [], 1)
-
-to get the OCIM2 z-indices that are closest to the
-ACCESS z-indices. And then you can pass it to this function via
-
-    lump_and_spray(wet3D, volume; dk=zidx)
-
-TODO: Fix these docs that have not been fully translated from MATLAB version.
+Outside of this region, no lumping.
+Default is `f=Returns(true)`, i.e. lump everywhere.
 """
-lump_and_spray(wet3D, volume; di=2, dj=2, dk=1) = _lump_and_spray(wet3D, volume, di, dj, dk)
-function _lump_and_spray(wet3D, volume, di::Int, dj::Int, dk::Int)
-    # grd wet array and vector and sizes
-    nx, ny, nz = size(wet3D)
-    # Convert scalar lumping options into lumping indices vector
-    # So that syntax like `di=2` works
-    vi = repeat(1:nx, inner=di)[1:nx]
-    vj = repeat(1:ny, inner=dj)[1:ny]
-    vk = repeat(1:nz, inner=dk)[1:nz]
+function lump_and_spray(wet3D, volume; f=Returns(true), di=2, dj=2, dk=1)
 
-    return _lump_and_spray(wet3D, volume, vi, vj, vk)
-end
-function _lump_and_spray(wet3D, volume, vi, vj, vk)
-    wet = wet3D[:]
-    nx, ny, nz = size(wet3D)
-    # Create lumping matrices in each dimension
-    LUMPx = sparse(vi, 1:nx, true)
-    LUMPy = sparse(vj, 1:ny, true)
-    LUMPz = sparse(vk, 1:nz, true)
-    # kron each dimension to build whole LUMP matrix
-    LUMP = kron(LUMPz, kron(LUMPy, LUMPx))
+    # extend the grid to avoid lumping cells outside of bounds
+    nxyz = size(wet3D)
+    LUMPidx = zeros(Int, nxyz .+ (di - 1, dj - 1, dk - 1))
+
+    # loop once over all grid cells and assign lumped indices
+    c = 1 # index / counter
+    neighbours = CartesianIndices((0:di-1, 0:dj-1, 0:dk-1))
+    C = CartesianIndices(nxyz)
+    for 𝑖 in eachindex(C)
+        C𝑖 = C[𝑖]
+        i, j, k = C𝑖.I
+        # assign index if not indexed yet
+        if LUMPidx[C𝑖] == 0
+            if f(i,j,k) # to all lumped cells if in region
+                LUMPidx[C𝑖 .+ neighbours] .= c
+            else # to only this cell if outside region
+                LUMPidx[C𝑖] = c
+            end
+            c += 1
+        end
+    end
+    LUMP = sparse(LUMPidx[:], 1:length(LUMPidx), 1)
 
     # Find wet points in coarsened grid
+    wet = wet3D[:]
     wet_c = LUMP * wet .> 0
-    nx_c = vi[end]
-    ny_c = vj[end]
-    nz_c = vk[end]
-    wet3D_c = fill(false, nx_c, ny_c, nz_c)
-    wet3D_c[wet_c] .= true
 
     # Extract only indices of wet grd points
     LUMP = LUMP[wet_c, wet]
@@ -90,12 +74,8 @@ function _lump_and_spray(wet3D, volume, vi, vj, vk)
     SPRAY = copy(LUMP')
     SPRAY.nzval .= 1
 
-    return LUMP, SPRAY, wet3D_c, volume_c
+    return LUMP, SPRAY, volume_c
 end
-
-
-
-
 
 
 

@@ -128,7 +128,7 @@ end
     v = v3D[wet3D]
 
     @info "coarsening grid"
-    LUMP, SPRAY, wet3D_c, v_c = OceanTransportMatrixBuilder.lump_and_spray(wet3D, v; di=2, dj=2, dk=1)
+    LUMP, SPRAY, v_c = OceanTransportMatrixBuilder.lump_and_spray(wet3D, v; di=2, dj=2, dk=1)
 
     # surface mask
     issrf3D = copy(wet3D)
