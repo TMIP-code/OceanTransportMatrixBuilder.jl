@@ -102,13 +102,14 @@ This code is © Benoît Pasquier (2025) and contributors, and it is made availab
 Over and above the legal restrictions imposed by this license, if you use this software for an academic publication then you are obliged to provide proper attribution.
 This can be to this code directly,
 
-> Benoît Pasquier (2025). OceanTransportMatrixBuilder.jl: A Julia package to build ocean transport matrices from CMIP model output. Zenodo. doi: [10.5281/zenodo.13864392](https://doi.org/10.5281/zenodo.13864392).
+> Benoît Pasquier (2025). **OceanTransportMatrixBuilder.jl: A Julia package to build ocean transport matrices from CMIP model output**. *Zenodo*. doi: [10.5281/zenodo.13864392](https://doi.org/10.5281/zenodo.13864392).
 
-or to the paper that it was developed for (currently under review for publication in *Geophysical Research Letters*),
+or to the paper that it was developed for:
 
-> Benoît Pasquier, Richard J. Matear, Matthew A. Chamberlain, Tilo Ziehn, David K. Hutchinson, Francois W. Primeau, Yi Liu, and Ann Bardin (2025). The sequestration efficiency of the deep ocean. ESS Open Archive. doi: [10.22541/essoar.174646362.20144320/v1](https://doi.org/10.22541/essoar.174646362.20144320/v1)
+> Pasquier, B., Matear, R. J., Chamberlain, M. A., Ziehn, T., Hutchinson, D. K., Primeau, F. W., et al. (2025). **The sequestration efficiency of the deep ocean**. *Geophysical Research Letters*, 52, e2025GL116799. doi: [10.1029/2025GL116799](https://doi.org/10.1029/2025GL116799).
 
-or (ideally) both.
+
+but, ideally, both.
 You can also find the citation(s) in BibTeX format in the `CITATION.bib` file.
 
 
