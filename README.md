@@ -16,7 +16,7 @@ That is, for the vector ***x*** representing the 3D tracer concentrations *x*(**
 The code of this package is an extension of the work of Matt Chamberlain, who built transport matrices from the ACCESS1.3 model[^Chamberlain_etal_2019], which has been successfully used in multiple following projects[^Holzer_etal_2020][^Pasquier_etal_2023][^Pasquier_etal_2024a][^Pasquier_etal_2024b].
 
 The main application driving this project is for the validation of marine Carbon Dioxide Removal (mCDR) by computing the timescales and pathways for water in the deep ocean to reemerge to the surface[^DeVries_etal_2012][^Siegel_etal_2021].
-A preprint, titled "The sequestration efficiency of the deep ocean", has been submitted to GRL[^Pasquier_etal_2025].
+A paper, titled "The sequestration efficiency of the deep ocean", has been published in GRL[^Pasquier_etal_2025].
 However, these matrices are useful in a number of contexts, e.g., for avoiding spin ups, optimization, or novel diagnostics[^John_et_al_2020].
 The motivation for sharing this package is thus to facilitate the use of novel diagnostics across CMIP models.
 
@@ -129,4 +129,4 @@ Benoît Pasquier (@briochemc) acknowledges funding through CSIRO's CarbonLock Fu
 [^John_et_al_2020]: [John et al. (2020)](10.1016/j.chemgeo.2019.119403) AWESOME OCIM: A simple, flexible, and powerful tool for modeling elemental cycling in the oceans.
 [^DeVries_etal_2012]: [DeVries et al. (2012)](10.1029/2012GL051963) The sequestration efficiency of the biological pump.
 [^Siegel_etal_2021]: [Siegel et al. (2021)](10.1088/1748-9326/ac0be0) Assessing the sequestration time scales of some ocean-based carbon dioxide reduction strategies.
-[^Pasquier_etal_2025]: [Pasquier et al. (2025)](https://doi.org/10.22541/essoar.174646362.20144320/v1) The sequestration efficiency of the deep ocean.
+[^Pasquier_etal_2025]: [Pasquier et al. (2025)](https://doi.org/10.1029/2025GL116799) The sequestration efficiency of the deep ocean.
