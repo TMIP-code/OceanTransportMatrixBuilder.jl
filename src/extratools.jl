@@ -31,7 +31,7 @@ where the lumping should occur.
 Outside of this region, no lumping.
 Default is `f=Returns(true)`, i.e. lump everywhere.
 """
-function lump_and_spray(wet3D, volume; f=Returns(true), di=2, dj=2, dk=1)
+function lump_and_spray(wet3D, vol; f=Returns(true), di=2, dj=2, dk=1)
 
     # extend the grid to avoid lumping cells outside of bounds
     nxyz = size(wet3D)
@@ -54,7 +54,7 @@ function lump_and_spray(wet3D, volume; f=Returns(true), di=2, dj=2, dk=1)
             c += 1
         end
     end
-    LUMP = sparse(LUMPidx[:], 1:length(LUMPidx), 1)
+    LUMP = sparse(LUMPidx[C][:], 1:length(C), 1)
 
     # Find wet points in coarsened grid
     wet = wet3D[:]
@@ -66,15 +66,15 @@ function lump_and_spray(wet3D, volume; f=Returns(true), di=2, dj=2, dk=1)
     # Make the LUMP operator volume-conserving
     # by volume integrating on the right and dividing by the coarse
     # volume on the left
-    volume_c = LUMP * volume
-    LUMP = sparse(Diagonal(1 ./ volume_c)) * LUMP * sparse(Diagonal(volume))
+    vol_c = LUMP * vol
+    LUMP = sparse(Diagonal(1 ./ vol_c)) * LUMP * sparse(Diagonal(vol))
 
     # The SPRAY operator just copies the values back
     # so it is sinply 1's with the transposed sparsity structure
     SPRAY = copy(LUMP')
     SPRAY.nzval .= 1
 
-    return LUMP, SPRAY, volume_c
+    return LUMP, SPRAY, vol_c
 end
 
 

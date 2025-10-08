@@ -2,7 +2,7 @@
 
 
 
-@testitem "velocities and mass transports" setup=[LocalBuiltMatrix] tags=[:skipci] begin
+@testitem "velocities and mass transports" setup=[LocalBuiltMatrix] tags=[:skipci, :local_full] begin
 
     using NaNStatistics
     using CairoMakie
@@ -15,7 +15,7 @@
 
     # plot for sanity check
     # plot zonal average density
-    ρ2D = dropdims(nansum(ρ.data .* v3D, dims = 1) ./ nansum(v3D, dims = 1), dims = 1)
+    ρ2D = dropdims(nansum(ρ .* v3D, dims = 1) ./ nansum(v3D, dims = 1), dims = 1)
     fig = Figure()
     ax = Axis(fig[1,1], xlabel = "latitude (°)", ylabel = "depth (m)")
     # levels = 25:0.1:30
@@ -32,10 +32,6 @@
     @info "Saving density zonal average as image file:\n $(joinpath("test", outputfile))"
     save(outputfile, fig)
 
-    κGM = 600 # m^2/s
-    maxslope = 0.01
-    uGM, vGM = OceanTransportMatrixBuilder.bolus_GM_velocity(ρ, gridmetrics, indices; κGM, maxslope)
-
     # Plot location of cell center for volcello, umo, vmo, uo, vo
     fig = Figure()
     ax = Axis(fig[1,1], xlabel = "lon", ylabel = "lat")
@@ -47,6 +43,12 @@
     text!(ax, vo_lon[1], vo_lat[1]; text="vo (i,j)", align = (:center, :bottom))
     fig
 
+
+    κGM = 600 # m^2/s
+    maxslope = 0.01
+    uGM, vGM = OceanTransportMatrixBuilder.bolus_GM_velocity(ρ, gridmetrics, indices; κGM, maxslope)
+
+
     uo2, uo2_lon, uo2_lat, vo2, vo2_lon, vo2_lat = OceanTransportMatrixBuilder.interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, gridmetrics)
     fig = Figure(size=(1500, 800))
     ax = Axis(fig[1,1], xlabel = "lon", ylabel = "lat", xgridvisible = false, ygridvisible = false)
@@ -54,24 +56,24 @@
     [poly!(ax, lon_vertices[:,i,j] |> vec, lat_vertices[:,i,j] |> vec, color = (:blue, 0.1)) for i in i for j in j if indices.wet3D[i,j,1]];
     [lines!(ax, lon_vertices[:,i,j] |> vec, lat_vertices[:,i,j] |> vec, color = (:black, 0.1)) for i in i for j in j];
     # lines!(ax, lon_vertices[1,i,j] |> Array, lat_vertices[1,i,j] |> Array, color = :black)
-    arrows!(ax, uo_lon[i,j,k] |> vec, uo_lat[i,j,k] |> vec, uo[i,j,k] |> vec, 0uo[i,j,k] |> vec, arrowsize = 10, lengthscale = 10, arrowcolor = :darkblue, linecolor = :darkblue)
-    arrows!(ax, vo_lon[i,j,k] |> vec, vo_lat[i,j,k] |> vec, 0vo[i,j,k] |> vec, vo[i,j,k] |> vec, arrowsize = 10, lengthscale = 10, arrowcolor = :darkred, linecolor = :darkred)
-    arrows!(ax, uo2_lon[i,j,k] |> vec, uo2_lat[i,j,k] |> vec, uo2[i,j,k] |> vec, 0uo2[i,j,k] |> vec, arrowsize = 10, lengthscale = 10, arrowcolor = :blue, linecolor = :blue)
-    arrows!(ax, vo2_lon[i,j,k] |> vec, vo2_lat[i,j,k] |> vec, 0vo2[i,j,k] |> vec, vo2[i,j,k] |> vec, arrowsize = 10, lengthscale = 10, arrowcolor = :red, linecolor = :red)
-    arrows!(ax, uo2_lon[i,j,k] |> vec, uo2_lat[i,j,k] .+ 0.02 |> vec, umo[i,j,k] |> vec, 0umo[i,j,k] |> vec, arrowsize = 10, lengthscale = 3e-8, arrowcolor = (:blue, 0.3), linecolor = (:blue, 0.3))
-    arrows!(ax, vo2_lon[i,j,k] .+ 0.02 |> vec, vo2_lat[i,j,k] |> vec, 0vmo[i,j,k] |> vec, vmo[i,j,k] |> vec, arrowsize = 10, lengthscale = 3e-8, arrowcolor = (:red, 0.3), linecolor = (:red, 0.3))
+    arrows2d!(ax, uo_lon[i,j,k] |> vec, uo_lat[i,j,k] |> vec, uo[i,j,k] |> vec, 0(uo[i,j,k] |> vec), lengthscale = 10, tipcolor = :darkblue, shaftcolor = :darkblue)
+    arrows2d!(ax, vo_lon[i,j,k] |> vec, vo_lat[i,j,k] |> vec, 0(vo[i,j,k] |> vec), vo[i,j,k] |> vec, lengthscale = 10, tipcolor = :darkred, shaftcolor = :darkred)
+    arrows2d!(ax, uo2_lon[i,j,k] |> vec, uo2_lat[i,j,k] |> vec, uo2[i,j,k] |> vec, 0(uo2[i,j,k] |> vec), lengthscale = 10, tipcolor = :blue, shaftcolor = :blue)
+    arrows2d!(ax, vo2_lon[i,j,k] |> vec, vo2_lat[i,j,k] |> vec, 0(vo2[i,j,k] |> vec), vo2[i,j,k] |> vec, lengthscale = 10, tipcolor = :red, shaftcolor = :red)
+    arrows2d!(ax, uo2_lon[i,j,k] |> vec, uo2_lat[i,j,k] .+ 0.02 |> vec, umo[i,j,k] |> vec, 0(umo[i,j,k] |> vec), lengthscale = 3e-8, tipcolor = (:blue, 0.3), shaftcolor = (:blue, 0.3))
+    arrows2d!(ax, vo2_lon[i,j,k] .+ 0.02 |> vec, vo2_lat[i,j,k] |> vec, 0(vmo[i,j,k] |> vec), vmo[i,j,k] |> vec, lengthscale = 3e-8, tipcolor = (:red, 0.3), shaftcolor = (:red, 0.3))
     fig
     ax = Axis(fig[1,2], xlabel = "lon", ylabel = "lat", xgridvisible = false, ygridvisible = false)
     i = 160 .+ (-3:3); j = 200 .+ (-2:2); k = 1
     [poly!(ax, lon_vertices[:,i,j] |> vec, lat_vertices[:,i,j] |> vec, color = (:blue, 0.1)) for i in i for j in j if indices.wet3D[i,j,1]];
     [lines!(ax, lon_vertices[:,i,j] |> vec, lat_vertices[:,i,j] |> vec, color = (:black, 0.1)) for i in i for j in j];
     # lines!(ax, lon_vertices[1,i,j] |> Array, lat_vertices[1,i,j] |> Array, color = :black)
-    arrows!(ax, uo_lon[i,j,k] |> vec, uo_lat[i,j,k] |> vec, uo[i,j,k] |> vec, 0uo[i,j,k] |> vec, arrowsize = 10, lengthscale = 10, arrowcolor = :darkblue, linecolor = :darkblue)
-    arrows!(ax, vo_lon[i,j,k] |> vec, vo_lat[i,j,k] |> vec, 0vo[i,j,k] |> vec, vo[i,j,k] |> vec, arrowsize = 10, lengthscale = 10, arrowcolor = :darkred, linecolor = :darkred)
-    arrows!(ax, uo2_lon[i,j,k] |> vec, uo2_lat[i,j,k] |> vec, uo2[i,j,k] |> vec, 0uo2[i,j,k] |> vec, arrowsize = 10, lengthscale = 10, arrowcolor = :blue, linecolor = :blue)
-    arrows!(ax, vo2_lon[i,j,k] |> vec, vo2_lat[i,j,k] |> vec, 0vo2[i,j,k] |> vec, vo2[i,j,k] |> vec, arrowsize = 10, lengthscale = 10, arrowcolor = :red, linecolor = :red)
-    arrows!(ax, uo2_lon[i,j,k] |> vec, uo2_lat[i,j,k] .+ 0.02 |> vec, umo[i,j,k] |> vec, 0umo[i,j,k] |> vec, arrowsize = 10, lengthscale = 1e-8, arrowcolor = (:blue, 0.3), linecolor = (:blue, 0.3))
-    arrows!(ax, vo2_lon[i,j,k] .+ 0.02 |> vec, vo2_lat[i,j,k] |> vec, 0vmo[i,j,k] |> vec, vmo[i,j,k] |> vec, arrowsize = 10, lengthscale = 1e-8, arrowcolor = (:red, 0.3), linecolor = (:red, 0.3))
+    arrows2d!(ax, uo_lon[i,j,k] |> vec, uo_lat[i,j,k] |> vec, uo[i,j,k] |> vec, 0(uo[i,j,k] |> vec), lengthscale = 10, tipcolor = :darkblue, shaftcolor = :darkblue)
+    arrows2d!(ax, vo_lon[i,j,k] |> vec, vo_lat[i,j,k] |> vec, 0(vo[i,j,k] |> vec), vo[i,j,k] |> vec, lengthscale = 10, tipcolor = :darkred, shaftcolor = :darkred)
+    arrows2d!(ax, uo2_lon[i,j,k] |> vec, uo2_lat[i,j,k] |> vec, uo2[i,j,k] |> vec, 0(uo2[i,j,k] |> vec), lengthscale = 10, tipcolor = :blue, shaftcolor = :blue)
+    arrows2d!(ax, vo2_lon[i,j,k] |> vec, vo2_lat[i,j,k] |> vec, 0(vo2[i,j,k] |> vec), vo2[i,j,k] |> vec, lengthscale = 10, tipcolor = :red, shaftcolor = :red)
+    arrows2d!(ax, uo2_lon[i,j,k] |> vec, uo2_lat[i,j,k] .+ 0.02 |> vec, umo[i,j,k] |> vec, 0(umo[i,j,k] |> vec), lengthscale = 1e-8, tipcolor = (:blue, 0.3), shaftcolor = (:blue, 0.3))
+    arrows2d!(ax, vo2_lon[i,j,k] .+ 0.02 |> vec, vo2_lat[i,j,k] |> vec, 0(vmo[i,j,k] |> vec), vmo[i,j,k] |> vec, lengthscale = 1e-8, tipcolor = (:red, 0.3), shaftcolor = (:red, 0.3))
     fig
 
     fig = Figure()
@@ -143,6 +145,9 @@ end
     M_c = sparse(Diagonal(issrf_c))
     sΓ_c = LUMP * sΓ
     @time "Solving ideal mean age" Γ_c = (T_c + M_c) \ sΓ_c
+    # Just some timings from machines I have used (ACCESS-ESM1-5 coarsened 2x2x1)
+    # time      machine  proc.   RAM
+    # 3min  MacBook Air  8 × M2  8GB
     Γ = SPRAY * Γ_c
     Γyr = ustrip.(yr, Γ .* s)
     Γ3D = OceanTransportMatrixBuilder.as3D(Γyr, wet3D)
@@ -220,6 +225,8 @@ end
     # Difference between the fluxes from velocities and mass transport
     (; uo, vo, umo, vmo, uo_lon, uo_lat, vo_lon, vo_lat, gridmetrics, ρ) = LocalBuiltMatrix
     umo_bis, vmo_bis = velocity2fluxes(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, gridmetrics, ρ)
+    umo_arr = umo |> Array
+    vmo_arr = vmo |> Array
     colorrange = 1e9 .* (-1, 1)
     colormap = cgrad(:RdBu, rev=true)
     Δcolorrange = (-5, 5)
@@ -239,22 +246,22 @@ end
         hidedecorations!(ax)
 
         ax = Axis(fig[1,2], xlabel = "i", ylabel = "j")
-        heatmap!(ax, umo[:,:,k]; colormap, colorrange)
+        heatmap!(ax, umo_arr[:,:,k]; colormap, colorrange)
         text!(ax, 0, 1; text = "umo", align = (:left, :top), offset = (5, -5), space = :relative)
         hidedecorations!(ax)
 
         ax = Axis(fig[2,2], xlabel = "i", ylabel = "j")
-        hm = heatmap!(ax, vmo[:,:,k]; colormap, colorrange)
+        hm = heatmap!(ax, vmo_arr[:,:,k]; colormap, colorrange)
         text!(ax, 0, 1; text = "vmo", align = (:left, :top), offset = (5, -5), space = :relative)
         hidedecorations!(ax)
 
         ax = Axis(fig[1,3], xlabel = "i", ylabel = "j")
-        heatmap!(ax, 100((umo_bis - umo) ./ umo)[:,:,k]; colormap = Δcolormap, colorrange = Δcolorrange)
+        heatmap!(ax, 100((umo_bis - umo_arr) ./ umo_arr)[:,:,k]; colormap = Δcolormap, colorrange = Δcolorrange)
         text!(ax, 0, 1; text = "(umo_bis − umo) / umo", align = (:left, :top), offset = (5, -5), space = :relative)
         hidedecorations!(ax)
 
         ax = Axis(fig[2,3], xlabel = "i", ylabel = "j")
-        Δhm = heatmap!(ax, 100((vmo_bis - vmo) ./ vmo)[:,:,k]; colormap = Δcolormap, colorrange = Δcolorrange)
+        Δhm = heatmap!(ax, 100((vmo_bis - vmo_arr) ./ vmo_arr)[:,:,k]; colormap = Δcolormap, colorrange = Δcolorrange)
         text!(ax, 0, 1; text = "(vmo_bis − vmo) / vmo", align = (:left, :top), offset = (5, -5), space = :relative)
         hidedecorations!(ax)
 

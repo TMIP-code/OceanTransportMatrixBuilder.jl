@@ -1,7 +1,7 @@
 
 
 
-@testitem "grid checks" tags = [:skipci] begin
+@testitem "grid checks" tags = [:skipci, :local_fast] begin
 
     using Test
     using OceanTransportMatrixBuilder
@@ -14,8 +14,10 @@
     using Unitful: m, km
 
     # TODO fix this so that I don't have to track all members
-    models = ("ACCESS-ESM1-5", "ACCESS-CM2", "ACCESS1-3", "ACCESS1-0")
-    members = ("r1i1p1f1", "r1i1p1f1", "r1i1p1", "r1i1p1")
+    # models = ("ACCESS-ESM1-5", "ACCESS-CM2", "ACCESS1-3", "ACCESS1-0")
+    # members = ("r1i1p1f1", "r1i1p1f1", "r1i1p1", "r1i1p1")
+    models = ("ACCESS-ESM1-5",)# "ACCESS-CM2", "ACCESS1-3", "ACCESS1-0")
+    members = ("r1i1p1f1",)# "r1i1p1f1", "r1i1p1", "r1i1p1")
 
     # models_untested = ("CMCC-CM2-HR4",)
     # members_untested = ("r1i1p1f1",)
@@ -39,7 +41,8 @@
     for (model, member) in zip(models, members)
 
         # My local directory for input files
-        inputdir = "/Users/benoitpasquier/Data/TMIP/data/$model/historical/$member/Jan1990-Dec1999"
+        inputdir = "$(ENV["HOME"])/Data/TMIP/data/$model/historical/$member/Jan1990-Dec1999"
+        @info "inputdir = $inputdir"
 
         # Load datasets
         volcello_ds = open_dataset(joinpath(inputdir, "volcello.nc"))

@@ -16,7 +16,7 @@
     # My local directory for input files
     model = "ACCESS-ESM1-5"
     member = "r1i1p1f1"
-    inputdir = "/Users/benoitpasquier/Data/TMIP/data/$model/historical/$member/Jan1990-Dec1999"
+    inputdir = "$(ENV["HOME"])/Data/TMIP/data/$model/historical/$member/Jan1990-Dec1999"
 
     # and for output files
     @show version = "v$(pkgversion(OceanTransportMatrixBuilder))"
@@ -64,9 +64,9 @@
     thetao_ds = open_dataset(joinpath(inputdir, "thetao.nc"))
     so_ds = open_dataset(joinpath(inputdir, "so.nc"))
     # Load variables in memory
-    thetao = readcubedata(thetao_ds.thetao)
+    thetao = readcubedata(thetao_ds.thetao) |> Array
     @test 0 < nanmean(thetao) < 20
-    so = readcubedata(so_ds.so)
+    so = readcubedata(so_ds.so) |> Array
     @show 30 < nanmean(so) < 40
     # Convert thetao and so to density
     ct = gsw_ct_from_pt.(so, thetao)

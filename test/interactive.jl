@@ -4,6 +4,7 @@ Pkg.instantiate()
 using TestEnv
 TestEnv.activate();
 
+using Revise
 
 using Test
 using OceanTransportMatrixBuilder
@@ -20,7 +21,7 @@ using LinearAlgebra
 # My local directory for input files
 model = "ACCESS-ESM1-5"
 member = "r1i1p1f1"
-inputdir = "/Users/benoitpasquier/Data/TMIP/data/$model/historical/$member/Jan1990-Dec1999"
+inputdir = "$(ENV["HOME"])/Data/TMIP/data/$model/historical/$member/Jan1990-Dec1999"
 
 # and for output files
 @show version = "v$(pkgversion(OceanTransportMatrixBuilder))"
@@ -73,8 +74,8 @@ thetao = readcubedata(thetao_ds.thetao)
 so = readcubedata(so_ds.so)
 @show 30 < nanmean(so) < 40
 # Convert thetao and so to density
-ct = gsw_ct_from_pt.(so, thetao)
-ρ = gsw_rho.(so, ct, Z3D)
+ct = map(gsw_ct_from_pt, so, thetao)
+ρ = map(gsw_rho, so, ct, Z3D)
 # TODO: Check if this is correct usage of gsw functions!
 # Alternatively use a fixed density:
 # ρ = 1035.0    # kg/m^3

@@ -30,7 +30,7 @@ using NetCDF
 using YAXArrays
 using OceanTransportMatrixBuilder
 
-inputdir = "/Users/benoitpasquier/Data/TMIP/data/ACCESS-ESM1-5/historical/r1i1p1f1/Jan1990-Dec1999"
+inputdir = "$(ENV["HOME"])/Data/TMIP/data/ACCESS-ESM1-5/historical/r1i1p1f1/Jan1990-Dec1999"
 # The path above is for my local machine. See test/onlinebuild.jl for an example using data from the cloud.
 
 # Load datasets
