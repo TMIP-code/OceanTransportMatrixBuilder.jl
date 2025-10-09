@@ -15,9 +15,9 @@ By rearranging the 3D grid of the ocean into a vector, the divergence of the flo
 That is, for the vector ***x*** representing the 3D tracer concentrations *x*(***r***) at locations ***r***, the divergence of the flow is linear in *x* and can be represented by **T** ***x*** as a transport matrix **T** acting on ***x***.
 The code of this package is an extension of the work of Matt Chamberlain, who built transport matrices from the ACCESS1.3 model[^Chamberlain_etal_2019], which has been successfully used in multiple following projects[^Holzer_etal_2020][^Pasquier_etal_2023][^Pasquier_etal_2024a][^Pasquier_etal_2024b].
 
-The main application driving this project is for the validation of marine Carbon Dioxide Removal (mCDR) by computing the timescales and pathways for water in the deep ocean to reemerge to the surface[^DeVries_etal_2012][^Siegel_etal_2021].
+The original application driving this project was for estimating ocean sequestration times for Carbon Capture and Storage (CCS) and Carbon Dioxide Removal (CDR) by computing the timescales and pathways for water in the deep ocean to reemerge to the surface[^DeVries_etal_2012][^Siegel_etal_2021].
 A paper, titled "The sequestration efficiency of the deep ocean", has been published in GRL[^Pasquier_etal_2025].
-However, these matrices are useful in a number of contexts, e.g., for avoiding spin ups, optimization, or novel diagnostics[^John_et_al_2020].
+However, these matrices are useful in many different contexts, e.g., for avoiding spin ups, optimisation, or novel diagnostics[^John_et_al_2020].
 The motivation for sharing this package is thus to facilitate the use of novel diagnostics across CMIP models.
 
 ## Example use
