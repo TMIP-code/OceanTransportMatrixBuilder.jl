@@ -275,15 +275,22 @@ end
 
 function makegridmetrics(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
 
+    # Differences in output "missing" data is commonplace,
+    # so we remove these here and use NaNs instead.
+    toreplace = Set{Any}((missing, nothing, 0)) # here we also replace 0 with NaN
+    haskey(areacello.properties, "_FillValue") && push!(toreplace, areacello.properties["_FillValue"])
+    haskey(volcello.properties, "_FillValue") && push!(toreplace, volcello.properties["_FillValue"])
+    replacelist = (x => NaN for x in toreplace)
+
 	# volume (3D)
     FillValue = volcello.properties["_FillValue"]
     v3D = volcello |> Array{Union{Missing, Float64}}
-	v3D = replace(v3D, missing => NaN, 0 => NaN, FillValue => NaN)
+	v3D = replace(v3D, replacelist...)
 
     # area (2D)
     FillValue = areacello.properties["_FillValue"]
     area2D = areacello |> Array{Union{Missing, Float64}}
-    area2D = replace(area2D, missing => NaN, 0 => NaN, FillValue => NaN)
+    area2D = replace(area2D, replacelist...)
 
 	# depth and cell height (3D)
 	thkcello = v3D ./ area2D
