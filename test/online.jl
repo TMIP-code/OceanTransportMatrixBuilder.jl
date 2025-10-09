@@ -99,7 +99,7 @@
 	# Check divergence and mass conservation
 
     # unpack model grid
-    (; v3D,) = gridmetrics
+    (; v3D, lon, lat, zt) = gridmetrics
     # unpack indices
     (; wet3D, N) = indices
 	e1 = ones(N)
@@ -123,5 +123,11 @@
 
     @test all(diagT.nzval .> 0)
     @test all((T - diagT).nzval .< 0)
+
+    @info "coarsening grid"
+    SOmask = lat.data .< -35
+    NAmask = @. (lat.data > 50) & ((lon.data < 100) | (250 < lon.data))
+    mymask = repeat(.!SOmask .& .!NAmask, 1, 1, size(wet3D, 3))
+    LUMP, SPRAY, v_c = OceanTransportMatrixBuilder.lump_and_spray(wet3D, v, mymask; di=2, dj=2, dk=1)
 
 end
