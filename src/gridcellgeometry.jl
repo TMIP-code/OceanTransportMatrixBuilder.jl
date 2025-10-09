@@ -283,12 +283,10 @@ function makegridmetrics(; areacello, volcello, lon, lat, lev, lon_vertices, lat
     replacelist = (x => NaN for x in toreplace)
 
 	# volume (3D)
-    FillValue = volcello.properties["_FillValue"]
     v3D = volcello |> Array{Union{Missing, Float64}}
 	v3D = replace(v3D, replacelist...)
 
     # area (2D)
-    FillValue = areacello.properties["_FillValue"]
     area2D = areacello |> Array{Union{Missing, Float64}}
     area2D = replace(area2D, replacelist...)
 
