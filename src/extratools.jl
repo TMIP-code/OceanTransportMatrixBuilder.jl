@@ -31,29 +31,28 @@ where the lumping should occur.
 Outside of this region, no lumping.
 Default is `f=Returns(true)`, i.e. lump everywhere.
 """
-function lump_and_spray(wet3D, vol; f=Returns(true), di=2, dj=2, dk=1)
+function lump_and_spray(wet3D, vol, mask=trues(size(wet3D)); di=2, dj=2, dk=1)
 
     # extend the grid to avoid lumping cells outside of bounds
     nxyz = size(wet3D)
+    C = CartesianIndices(nxyz)
     LUMPidx = zeros(Int, nxyz .+ (di - 1, dj - 1, dk - 1))
 
     # loop once over all grid cells and assign lumped indices
     c = 1 # index / counter
     neighbours = CartesianIndices((0:di-1, 0:dj-1, 0:dk-1))
-    C = CartesianIndices(nxyz)
     for 𝑖 in eachindex(C)
         C𝑖 = C[𝑖]
-        i, j, k = C𝑖.I
-        # assign index if not indexed yet
-        if LUMPidx[C𝑖] == 0
-            if f(i,j,k) # to all lumped cells if in region
-                LUMPidx[C𝑖 .+ neighbours] .= c
-            else # to only this cell if outside region
-                LUMPidx[C𝑖] = c
-            end
-            c += 1
+        LUMPidx[C𝑖] ≠ 0 && mask[C𝑖] && continue # skip if index already assigned
+        if mask[C𝑖] # if in region, assign all neighbours also in region
+            LUMPidx[C𝑖 .+ neighbours] .= c
+        else # to only this cell if outside region
+            LUMPidx[C𝑖] = c
         end
+        c += 1
     end
+
+    # Remove ghost cells outside of original grid
     LUMP = sparse(LUMPidx[C][:], 1:length(C), 1)
 
     # Find wet points in coarsened grid
@@ -73,6 +72,13 @@ function lump_and_spray(wet3D, vol; f=Returns(true), di=2, dj=2, dk=1)
     # so it is sinply 1's with the transposed sparsity structure
     SPRAY = copy(LUMP')
     SPRAY.nzval .= 1
+
+    # Print some info
+    nwet = size(LUMP, 2)
+    nwet_c = size(LUMP, 1)
+    @info """LUMP and SPRAY:
+    Matrix size reduction: $(round(100(1 - nwet_c/nwet)))% ($nwet -> $nwet_c)
+    """
 
     return LUMP, SPRAY, vol_c
 end
