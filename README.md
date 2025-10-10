@@ -17,13 +17,19 @@ The code of this package is an extension of the work of Matt Chamberlain, who bu
 
 The original application driving this project was for estimating ocean sequestration times for Carbon Capture and Storage (CCS) and Carbon Dioxide Removal (CDR) by computing the timescales and pathways for water in the deep ocean to reemerge to the surface[^DeVries_etal_2012][^Siegel_etal_2021].
 A paper, titled "The sequestration efficiency of the deep ocean", has been published in GRL[^Pasquier_etal_2025].
-However, these matrices are useful in many different contexts, e.g., for avoiding spin ups, optimisation, or novel diagnostics[^John_et_al_2020].
-The motivation for sharing this package is thus to facilitate the use of novel diagnostics across CMIP models.
+
+However, **these matrices are useful in many other contexts**, e.g., for avoiding spin ups, optimisation, or novel diagnostics[^John_et_al_2020].
+We are sharing this package to get people to use transport matrices and produce novel diagnostics of CMIP models.
 
 ## Example use
 
-The intended use would be simply to feed the ocean transport output from a given CMIP model to the functions in this package to build the desired transport matrix.
-After the required NetCDF files have been created (see some preliminary but working Python code for creating such files in [TMIP-code/notebooks](https://github.com/TMIP-code/notebooks))
+To build a transport matrix, we simply need the transport output from a CMIP model archive.
+Below is an example of doing so.
+
+> [!TIP]
+> The NetCDF files used below were created from CMIP archives (I averaged the mass transports over the 1990s; you can find the Python code for creating them in [TMIP-code/notebooks](https://github.com/TMIP-code/notebooks))
+> But the `test/` directory also contains other examples, including one downloading CMIP data for you!
+
 
 ```julia
 using NetCDF
@@ -91,8 +97,7 @@ ACCESS-CM2
 ACCESS-OM2
 ```
 
-> [!TIP]
-> The `test/` directory contains up-to-date examples for building the transport matrix and doing some simple calculations.
+
 
 ## Citation
 
