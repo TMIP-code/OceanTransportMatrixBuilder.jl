@@ -119,6 +119,7 @@ end
     using Unitful: s, yr
     using NaNStatistics
     using CairoMakie
+    using Graphs
 
     (; gridmetrics, indices, T, model, member, outputdir) = LocalBuiltMatrix
 
@@ -133,8 +134,22 @@ end
     SOmask = lat .< -35
     NAmask = @. (lat > 50) & ((lon < 100) | (250 < lon))
     mymask = repeat(.!SOmask .& .!NAmask, 1, 1, size(wet3D, 3))
-    LUMP, SPRAY, v_c = OceanTransportMatrixBuilder.lump_and_spray(wet3D, v, mymask; di=2, dj=2, dk=1)
-    LUMP, SPRAY, v_c = OceanTransportMatrixBuilder.lump_and_spray(wet3D, v; di=2, dj=2, dk=1)
+
+    # Test extreme coarsening to show behavior across land and plot it
+    LUMP, SPRAY, v_c = OceanTransportMatrixBuilder.lump_and_spray(wet3D, v, T, mymask; di=10, dj=10, dk=1)
+    sprayedrand = SPRAY * rand(size(LUMP, 1))
+    sprayedrand3D = OceanTransportMatrixBuilder.as3D(sprayedrand, wet3D)
+    fig, ax, hm = surface(mod.(lon .- 80, 360) .+ 80, lat, zeros(size(lat));
+        color=sprayedrand3D[:,:,1],
+        colormap = :turbo,
+        shading = false
+    )
+    outputfile = joinpath(outputdir, "LUMP_and_SPRAY_coarsening.png")
+    @info "Saving coarsening as image file:\n $(joinpath("test", outputfile))"
+    save(outputfile, fig)
+
+    # Redo coarsening with less extreme coarsening
+    LUMP, SPRAY, v_c = OceanTransportMatrixBuilder.lump_and_spray(wet3D, v, T; di=2, dj=2, dk=1)
 
     # surface mask
     issrf3D = copy(wet3D)

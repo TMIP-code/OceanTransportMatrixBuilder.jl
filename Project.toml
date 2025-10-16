@@ -1,24 +1,26 @@
 name = "OceanTransportMatrixBuilder"
 uuid = "c2b4a04e-6049-4fc4-aa6a-5508a29a1e1c"
+version = "0.8.0"
 authors = ["Benoit Pasquier <briochemc@gmail.com> and contributors"]
-version = "0.7.2"
 
 [deps]
 Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
+Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
 Distances = "0.10"
+Graphs = "1.13.1"
 LinearAlgebra = "1"
 SparseArrays = "1"
 StaticArrays = "1"
 julia = "1.10"
 
 [extras]
-CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DimensionalData = "0703355e-b756-11e9-17c0-8b28908087d0"
 Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"

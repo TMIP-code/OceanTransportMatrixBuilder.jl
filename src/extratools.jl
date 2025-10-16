@@ -31,32 +31,56 @@ where the lumping should occur.
 Outside of this region, no lumping.
 Default is `f=Returns(true)`, i.e. lump everywhere.
 """
-function lump_and_spray(wet3D, vol, mask=trues(size(wet3D)); di=2, dj=2, dk=1)
+function lump_and_spray(wet3D, vol, T, mask=trues(size(wet3D)); di=2, dj=2, dk=1)
 
     # extend the grid to avoid lumping cells outside of bounds
     nxyz = size(wet3D)
     C = CartesianIndices(nxyz)
     LUMPidx = zeros(Int, nxyz .+ (di - 1, dj - 1, dk - 1))
 
+    wet = wet3D[:]
+    i, j = findnz(T)
+    L = LinearIndices(nxyz .+ (di - 1, dj - 1, dk - 1))
+    wet3Dext = falses(nxyz .+ (di - 1, dj - 1, dk - 1))
+    wet3Dext[C[wet3D]] .= true
+    Lwet = L[wet3Dext] # careful here, as L is larger than wet3D
+
+    connectivitymatrix = sparse(Lwet[i], Lwet[j], true, length(LUMPidx), length(LUMPidx))
+
     # loop once over all grid cells and assign lumped indices
-    c = 1 # index / counter
+    c = 2 # index / counter (we start at 2 because 1 is reserved for dry cells)
     neighbours = CartesianIndices((0:di-1, 0:dj-1, 0:dk-1))
     for 𝑖 in eachindex(C)
         C𝑖 = C[𝑖]
-        LUMPidx[C𝑖] ≠ 0 && mask[C𝑖] && continue # skip if index already assigned
+        # skip if index already assigned and in mask
+        #(if assigned but not in mask, must reassign)
+        LUMPidx[C𝑖] > 0 && mask[C𝑖] && continue
         if mask[C𝑖] # if in region, assign all neighbours also in region
-            LUMPidx[C𝑖 .+ neighbours] .= c
-        else # to only this cell if outside region
+            # list of neighbours
+            L𝑖 = L[C𝑖 .+ neighbours][:]
+            # First, assign dry index to dry cells
+            localwet = wet3Dext[L𝑖]
+            dryidx = L𝑖[.!localwet]
+            LUMPidx[dryidx] .= 1
+            # Then build a simple connectivity graph of the remaining cells to be lumped
+            wetidx = L𝑖[localwet]
+            localconnectivitymatrix = view(connectivitymatrix, wetidx, wetidx)
+            g = SimpleGraph(localconnectivitymatrix)
+            # and split it in connected components
+            for comp in connected_components(g)
+                LUMPidx[wetidx[comp]] .= c
+                c += 1
+            end
+        else # if outside region, assign new index
             LUMPidx[C𝑖] = c
+            c += 1
         end
-        c += 1
     end
 
     # Remove ghost cells outside of original grid
     LUMP = sparse(LUMPidx[C][:], 1:length(C), 1)
 
     # Find wet points in coarsened grid
-    wet = wet3D[:]
     wet_c = LUMP * wet .> 0
 
     # Extract only indices of wet grd points
@@ -84,6 +108,18 @@ function lump_and_spray(wet3D, vol, mask=trues(size(wet3D)); di=2, dj=2, dk=1)
 end
 
 
+"""
+diconnected_cells(wet3D, T; di=2, dj=2, dk=1)
+
+"""
+function connected_cells(wet3D, T; di=2, dj=2, dk=1)
+    i, j = findnz(SPRAY * LUMP)
+    connected_by_grid = sparse(i, j, true, size(T)...)
+    i, j = findnz(T)
+    connected_by_T = sparse(i, j, true, size(T)...)
+    connected = connected_by_grid .& connected_by_T
+    connected = ((connected^di)^dj)^dk
+end
 
 
 

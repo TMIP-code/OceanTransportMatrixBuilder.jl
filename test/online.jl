@@ -128,6 +128,6 @@
     SOmask = lat .< -35
     NAmask = @. (lat > 50) & ((lon < 100) | (250 < lon))
     mymask = repeat(.!SOmask .& .!NAmask, 1, 1, size(wet3D, 3))
-    LUMP, SPRAY, v_c = OceanTransportMatrixBuilder.lump_and_spray(wet3D, v, mymask; di=2, dj=2, dk=1)
+    LUMP, SPRAY, v_c = OceanTransportMatrixBuilder.lump_and_spray(wet3D, v, T, mymask; di=2, dj=2, dk=1)
 
 end

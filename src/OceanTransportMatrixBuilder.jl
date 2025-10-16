@@ -7,6 +7,7 @@ using LinearAlgebra
 # deps
 using Distances: haversine
 using StaticArrays: FieldVector
+using Graphs: SimpleGraph, connected_components
 
 # Main functions to be exposed
 include("matrixbuilding.jl")

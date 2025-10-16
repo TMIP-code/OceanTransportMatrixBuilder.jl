@@ -120,3 +120,31 @@ end
 
 # @profview transportmatrix(; ϕ, mlotst, gridmetrics, indices, ρ, κH, κVML, κVdeep)
 # @profview_allocs transportmatrix(; ϕ, mlotst, gridmetrics, indices, ρ, κH, κVML, κVdeep) sample_rate=0.9
+
+
+# unpack model grid
+(; v3D, lat, lon, zt) = gridmetrics
+# unpack indices
+(; wet3D, N) = indices
+
+v = v3D[wet3D]
+
+@info "coarsening grid"
+SOmask = lat .< -35
+NAmask = @. (lat > 50) & ((lon < 100) | (250 < lon))
+mymask = repeat(.!SOmask .& .!NAmask, 1, 1, size(wet3D, 3))
+
+# Test extreme coarsening and plot it
+LUMP, SPRAY, v_c = OceanTransportMatrixBuilder.lump_and_spray(wet3D, v, T, mymask; di=10, dj=10, dk=1)
+# Plot the lumping
+using CairoMakie
+sprayedrand = SPRAY * rand(size(LUMP, 1))
+sprayedrand3D = OceanTransportMatrixBuilder.as3D(sprayedrand, wet3D)
+fig, ax, hm = surface(mod.(lon .- 80, 360) .+ 80, lat, zeros(size(lat));
+    color=sprayedrand3D[:,:,45],
+    colormap = :turbo,
+    shading = false
+)
+outputfile = joinpath(outputdir, "LUMP_and_SPRAY_coarsening.png")
+@info "Saving coarsening as image file:\n $(joinpath("test", outputfile))"
+save(outputfile, fig)
