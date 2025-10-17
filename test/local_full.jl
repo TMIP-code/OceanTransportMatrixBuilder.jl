@@ -137,11 +137,12 @@ end
 
     # Test extreme coarsening to show behavior across land and plot it
     LUMP, SPRAY, v_c = OceanTransportMatrixBuilder.lump_and_spray(wet3D, v, T, mymask; di=10, dj=10, dk=1)
-    sprayedrand = SPRAY * rand(size(LUMP, 1))
+    colormap = cgrad(:okabe_ito, categorical=true)
+    sprayedrand = SPRAY * rand(1:length(colormap), size(LUMP, 1))
     sprayedrand3D = OceanTransportMatrixBuilder.as3D(sprayedrand, wet3D)
     fig, ax, hm = surface(mod.(lon .- 80, 360) .+ 80, lat, zeros(size(lat));
         color=sprayedrand3D[:,:,1],
-        colormap = :turbo,
+        colormap,
         shading = false
     )
     outputfile = joinpath(outputdir, "LUMP_and_SPRAY_coarsening.png")

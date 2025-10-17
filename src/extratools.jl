@@ -1,7 +1,11 @@
 """
-    LUMP, SPRAY, v_c = lump_and_spray(wet3D, volume; f=Returns(true),di=2, dj=2, dk=1)
+    LUMP, SPRAY, v_c = lump_and_spray(wet3D, vol, T, mask=trues(size(wet3D)); di=2, dj=2, dk=1)
 
 returns the LUMP and SPRAY matrices, and the coarsened volume vector.
+
+The `vol` vector of volumes is used to make the LUMP operator volume-conserving.
+The `T` matrix is used to determine connectivity of the grid cells, so as to avoid lumping disconnected cells.
+The `mask` boolean array (same size as `wet3D`) can be used to restrict the lumping to a certain region.
 
 To get the coarsened vector from fine vector x, use
 
@@ -105,20 +109,6 @@ function lump_and_spray(wet3D, vol, T, mask=trues(size(wet3D)); di=2, dj=2, dk=1
     """
 
     return LUMP, SPRAY, vol_c
-end
-
-
-"""
-diconnected_cells(wet3D, T; di=2, dj=2, dk=1)
-
-"""
-function connected_cells(wet3D, T; di=2, dj=2, dk=1)
-    i, j = findnz(SPRAY * LUMP)
-    connected_by_grid = sparse(i, j, true, size(T)...)
-    i, j = findnz(T)
-    connected_by_T = sparse(i, j, true, size(T)...)
-    connected = connected_by_grid .& connected_by_T
-    connected = ((connected^di)^dj)^dk
 end
 
 
