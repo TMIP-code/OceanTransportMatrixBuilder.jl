@@ -1,4 +1,3 @@
-
 """
     velocity2fluxes(u, u_lon, u_lat, v, v_lon, v_lat, gridmetrics, ρ)
 
@@ -29,9 +28,9 @@ function velocity2fluxes(u, u_lon, u_lat, v, v_lon, v_lat, gridmetrics, ρ)
     for 𝑖 in indices.C
         i, j = 𝑖.I # indices to access the 2D array
         𝑗 = i₊₁(𝑖, gridtopology) # grid cell to the "east"
-        ϕᵢ[𝑖] = u[𝑖] * twocellnanmean(ρ, 𝑖, 𝑗) * twocellnanmin(thkcello, 𝑖, 𝑗) * edge_length_2D[:east][i,j]
+        ϕᵢ[𝑖] = u[𝑖] * twocellnanmean(ρ, 𝑖, 𝑗) * twocellnanmin(thkcello, 𝑖, 𝑗) * edge_length_2D[:east][i, j]
         𝑗 = j₊₁(𝑖, gridtopology) # grid cell to the "north"
-        ϕⱼ[𝑖] = v[𝑖] * twocellnanmean(ρ, 𝑖, 𝑗) * twocellnanmin(thkcello, 𝑖, 𝑗) * edge_length_2D[:north][i,j]
+        ϕⱼ[𝑖] = v[𝑖] * twocellnanmean(ρ, 𝑖, 𝑗) * twocellnanmin(thkcello, 𝑖, 𝑗) * edge_length_2D[:north][i, j]
     end
     # TODO check that this orientation is correct for all models?
     # I think this only applies to Arakawa C-grids...
@@ -55,7 +54,7 @@ Return the nanmean of `a` and `b` (scalars).
 function nanmean2(a, b)
     wa = !isnan(a)
     wb = !isnan(b)
-    (wa * a + wb * b) / (wa + wb)
+    return (wa * a + wb * b) / (wa + wb)
 end
 
 """
@@ -165,9 +164,9 @@ function facefluxes(umo, vmo, gridmetrics, indices; FillValue)
     @assert !all(x -> isnan(x) || (x == FillValue), umo)
     @assert !all(x -> isnan(x) || (x == FillValue), vmo)
 
-	@debug "Making ϕeast"
-	ϕeast = replace(umo, NaN=>0.0, FillValue=>0.0) .|> Float64
-	@debug "Making ϕwest"
+    @debug "Making ϕeast"
+    ϕeast = replace(umo, NaN => 0.0, FillValue => 0.0) .|> Float64
+    @debug "Making ϕwest"
     # ϕwest[i] is ϕeast[west of i]
     ϕwest = zeros(size(ϕeast))
     for i in eachindex(ϕwest)
@@ -176,37 +175,37 @@ function facefluxes(umo, vmo, gridmetrics, indices; FillValue)
         ϕwest[i] = ϕeast[W]
     end
 
-	@debug "Making ϕnorth"
-	# Check that south pole ϕnorth is zero (so that it causes no issues with circular shift)
-	ϕnorth = replace(vmo, NaN=>0.0, FillValue=>0.0) .|> Float64
-	@debug "Making ϕsouth"
+    @debug "Making ϕnorth"
+    # Check that south pole ϕnorth is zero (so that it causes no issues with circular shift)
+    ϕnorth = replace(vmo, NaN => 0.0, FillValue => 0.0) .|> Float64
+    @debug "Making ϕsouth"
     # ϕsouth[i] is ϕnorth[south of i]
     # Note from BP: This might break if there is a seam at the South Pole
-	ϕsouth = zeros(size(ϕnorth))
+    ϕsouth = zeros(size(ϕnorth))
     for i in eachindex(ϕsouth)
         S = j₋₁(C[i], gridtopology)
         isnothing(S) && continue
         ϕsouth[i] = ϕnorth[S]
     end
 
-	@debug "Making ϕtop and ϕbottom"
-	# Then build ϕtop and ϕbottom from bottom up
-	# Mass conservation implies that
-	# 	ϕwest + ϕsouth + ϕbottom - ϕeast - ϕnorth - ϕtop = 0
-	# except at the top.
-	# We could build w from the bottom up, by looking at each
-	# water column's sea floor, but it's simpler to go from the top down,
-	# and then remove ϕbottom
-	ϕbottom = similar(ϕeast)
-	ϕtop = similar(ϕeast)
-	for k in reverse(eachindex(axes(ϕeast, 3)))
-		if k == lastindex(axes(ϕeast, 3))
-			@views @. ϕbottom[:,:,k] = 0 # seafloor ϕbottom is zero
-		else
-			@views @. ϕbottom[:,:,k] = ϕtop[:,:,k+1] # otherwise it's ϕtop from below
-		end
-		@views @. ϕtop[:,:,k] = ϕbottom[:,:,k] + ϕwest[:,:,k] + ϕsouth[:,:,k] - ϕeast[:,:,k] - ϕnorth[:,:,k]
-	end
+    @debug "Making ϕtop and ϕbottom"
+    # Then build ϕtop and ϕbottom from bottom up
+    # Mass conservation implies that
+    # 	ϕwest + ϕsouth + ϕbottom - ϕeast - ϕnorth - ϕtop = 0
+    # except at the top.
+    # We could build w from the bottom up, by looking at each
+    # water column's sea floor, but it's simpler to go from the top down,
+    # and then remove ϕbottom
+    ϕbottom = similar(ϕeast)
+    ϕtop = similar(ϕeast)
+    for k in reverse(eachindex(axes(ϕeast, 3)))
+        if k == lastindex(axes(ϕeast, 3))
+            @views @. ϕbottom[:, :, k] = 0 # seafloor ϕbottom is zero
+        else
+            @views @. ϕbottom[:, :, k] = ϕtop[:, :, k + 1] # otherwise it's ϕtop from below
+        end
+        @views @. ϕtop[:, :, k] = ϕbottom[:, :, k] + ϕwest[:, :, k] + ϕsouth[:, :, k] - ϕeast[:, :, k] - ϕnorth[:, :, k]
+    end
 
     ϕ = (
         east = ϕeast,
@@ -214,12 +213,8 @@ function facefluxes(umo, vmo, gridmetrics, indices; FillValue)
         north = ϕnorth,
         south = ϕsouth,
         top = ϕtop,
-        bottom = ϕbottom
+        bottom = ϕbottom,
     )
 
-	return ϕ
+    return ϕ
 end
-
-
-
-

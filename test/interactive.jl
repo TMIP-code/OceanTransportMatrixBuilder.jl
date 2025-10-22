@@ -93,7 +93,7 @@ ct = map(gsw_ct_from_pt, so, thetao)
 # Diffusivites
 κH = 500.0    # m^2/s
 κVML = 0.1    # m^2/s
-κVdeep = 1e-5 # m^2/s
+κVdeep = 1.0e-5 # m^2/s
 
 # Make indices
 indices = makeindices(gridmetrics.v3D)
@@ -132,13 +132,14 @@ v = v3D[wet3D]
 SOmask = lat .< -35
 NAmask = @. (lat > 50) & ((lon < 100) | (250 < lon))
 mymask = repeat(.!SOmask .& .!NAmask, 1, 1, size(wet3D, 3))
-LUMP, SPRAY, v_c = OceanTransportMatrixBuilder.lump_and_spray(wet3D, v, T, mymask; di=10, dj=10, dk=1)
+LUMP, SPRAY, v_c = OceanTransportMatrixBuilder.lump_and_spray(wet3D, v, T, mymask; di = 10, dj = 10, dk = 1)
 # Plot the lumping
 using CairoMakie
 sprayedrand = SPRAY * rand(size(LUMP, 1))
 sprayedrand3D = OceanTransportMatrixBuilder.as3D(sprayedrand, wet3D)
-fig, ax, hm = surface(mod.(lon .- 80, 360) .+ 80, lat, zeros(size(lat));
-    color=sprayedrand3D[:,:,45],
+fig, ax, hm = surface(
+    mod.(lon .- 80, 360) .+ 80, lat, zeros(size(lat));
+    color = sprayedrand3D[:, :, 45],
     colormap = :turbo,
     shading = false
 )

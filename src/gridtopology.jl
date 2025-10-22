@@ -25,16 +25,16 @@ function getgridtopology(lon_vertices, lat_vertices, lev)
     ny = size(lon_vertices, 3)
     nz = length(lev)
     # North pole vertices
-    NPlon = @view lon_vertices[3:4,:,end]
-    NPlat = @view lat_vertices[3:4,:,end]
+    NPlon = @view lon_vertices[3:4, :, end]
+    NPlat = @view lat_vertices[3:4, :, end]
     # If all the latitudes of the "northmost" vertices are 90, then it's a "regular" grid with 2 poles
     if all(NPlat .== 90)
-        return BipolarGridTopology(nx,ny,nz)
-    # Otherwise check if the north pole is split in two
+        return BipolarGridTopology(nx, ny, nz)
+        # Otherwise check if the north pole is split in two
     elseif isapprox(NPlon, rot180(NPlon)) && isapprox(NPlat, rot180(NPlat))
-        return TripolarGridTopology(nx,ny,nz)
+        return TripolarGridTopology(nx, ny, nz)
     else
-        return UnknownGridTopology(nx,ny,nz)
+        return UnknownGridTopology(nx, ny, nz)
     end
 end
 
@@ -55,20 +55,19 @@ k₋₁(C, ::AbstractGridTopology) = C.I[3] > 1 ? C + CartesianIndex(0, 0, -1) :
 getindexornan(χ, I) = isnothing(I) ? NaN : χ[I] # TODO check that this is going to work
 
 
-
-function ishift(C, g::AbstractGridTopology, n=0)
+function ishift(C, g::AbstractGridTopology, n = 0)
     i, j, k = C.I
-    CartesianIndex(mod1(i + n, g.nx), j, k)
+    return CartesianIndex(mod1(i + n, g.nx), j, k)
 end
-function jshift(C, g::AbstractGridTopology, n=0)
+function jshift(C, g::AbstractGridTopology, n = 0)
     i, j, k = C.I
     j2 = j + n
-    (1 ≤ j2 ≤ g.ny) ? CartesianIndex(i, j2, k) : nothing
+    return (1 ≤ j2 ≤ g.ny) ? CartesianIndex(i, j2, k) : nothing
 end
-function kshift(C, g::AbstractGridTopology, n=0)
+function kshift(C, g::AbstractGridTopology, n = 0)
     i, j, k = C.I
     k2 = k + n
-    (1 ≤ k2 ≤ g.nz) ? CartesianIndex(i, j, k2) : nothing
+    return (1 ≤ k2 ≤ g.nz) ? CartesianIndex(i, j, k2) : nothing
 end
 
 # Special behavior for tripolar grids where the seam connects the top and "folds" it around
@@ -81,7 +80,7 @@ end
 j₊₁(C, g::TripolarGridTopology) = C.I[2] < g.ny ? C + CartesianIndex(0, 1, 0) : CartesianIndex(g.nx - C.I[1] + 1, g.ny, C.I[3])
 j₊₁(C::CartesianIndex{2}, g::TripolarGridTopology) = C.I[2] < g.ny ? C + CartesianIndex(0, 1) : CartesianIndex(g.nx - C.I[1] + 1, g.ny)
 
-function jshift(C, g::TripolarGridTopology, n=0)
+function jshift(C, g::TripolarGridTopology, n = 0)
     i, j, k = C.I
     j2 = j + n
     if !(1 ≤ j2)

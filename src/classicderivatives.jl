@@ -1,4 +1,3 @@
-
 ####################################
 # Forward and backward derivatives #
 ####################################
@@ -78,10 +77,6 @@ function ∂ₖ₋(χ, gridmetrics)
 end
 
 
-
-
-
-
 # TODO: Check that I am properly dealing with unevenly spaced grids
 # The commented code below could help with that, as it provides the weights
 # for a finite difference stencil for any arrangement of grid points
@@ -100,5 +95,3 @@ end
 #     A = @. (x' - x₀)^ℓ / factorial(ℓ)
 #     return A \ (ℓ .== m) # vector of weights w
 # end
-
-

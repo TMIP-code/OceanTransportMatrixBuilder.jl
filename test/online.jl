@@ -1,5 +1,3 @@
-
-
 @testitem "ACCESS-ESM1-5" begin
 
     # using Test
@@ -31,13 +29,13 @@
     @show vo_store = filter(row -> row.variable_id == "vo" && row.table_id == "Omon" && common_filter(row), catalog).zstore[1]
 
     @info "Lazily load data using Zarr"
-    volcello_zarr = zopen(volcello_store, consolidated=true)
-    areacello_zarr = zopen(areacello_store, consolidated=true)
-    mlotst_zarr = zopen(mlotst_store, consolidated=true)
-    umo_zarr = zopen(umo_store, consolidated=true)
-    vmo_zarr = zopen(vmo_store, consolidated=true)
-    uo_zarr = zopen(uo_store, consolidated=true)
-    vo_zarr = zopen(vo_store, consolidated=true)
+    volcello_zarr = zopen(volcello_store, consolidated = true)
+    areacello_zarr = zopen(areacello_store, consolidated = true)
+    mlotst_zarr = zopen(mlotst_store, consolidated = true)
+    umo_zarr = zopen(umo_store, consolidated = true)
+    vmo_zarr = zopen(vmo_store, consolidated = true)
+    uo_zarr = zopen(uo_store, consolidated = true)
+    vo_zarr = zopen(vo_store, consolidated = true)
 
     @info "Select first time step to limit download size"
     volcello_ds = open_dataset(volcello_zarr)
@@ -70,7 +68,7 @@
     ρ = 1035.0    # kg/m^3
     κH = 500.0    # m^2/s
     κVML = 0.1    # m^2/s
-    κVdeep = 1e-5 # m^2/s
+    κVdeep = 1.0e-5 # m^2/s
 
     # Make makegridmetrics
     gridmetrics = makegridmetrics(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
@@ -92,31 +90,31 @@
     (; T, Tadv, TκH, TκVML, TκVdeep) = transportmatrix(; ϕ, mlotst, gridmetrics, indices, ρ, κH, κVML, κVdeep)
 
     Tsyms = (:T, :Tadv, :TκH, :TκVML, :TκVdeep)
-	for Ttest in (T, Tadv, TκH, TκVML, TκVdeep)
+    for Ttest in (T, Tadv, TκH, TκVML, TκVdeep)
         @test Ttest isa SparseMatrixCSC{Float64, Int}
     end
 
-	# Check divergence and mass conservation
+    # Check divergence and mass conservation
 
     # unpack model grid
     (; v3D, lon, lat, zt) = gridmetrics
     # unpack indices
     (; wet3D, N) = indices
-	e1 = ones(N)
-	v = v3D[wet3D]
-	Tsyms = (:T, :Tadv, :TκH, :TκVML, :TκVdeep)
-	@info "Timescales (divergence and mass conservation)"
-	for (Ttest, Tsym) in zip((T, Tadv, TκH, TκVML, TκVdeep), Tsyms)
-		@info "  $Tsym:"
+    e1 = ones(N)
+    v = v3D[wet3D]
+    Tsyms = (:T, :Tadv, :TκH, :TκVML, :TκVdeep)
+    @info "Timescales (divergence and mass conservation)"
+    for (Ttest, Tsym) in zip((T, Tadv, TκH, TκVML, TκVdeep), Tsyms)
+        @info "  $Tsym:"
 
         τdiv = ustrip(Myr, norm(e1) / norm(Ttest * e1) * s)
-        Tsym ∉ (:T, :Tadv) && @test τdiv > 1e6
-		@info "    div: $(round(τdiv, sigdigits=2)) Myr"
+        Tsym ∉ (:T, :Tadv) && @test τdiv > 1.0e6
+        @info "    div: $(round(τdiv, sigdigits = 2)) Myr"
 
-		τvol = ustrip(Myr, norm(v) / norm(Ttest' * v) * s)
-        @test τvol > 1e6
-		@info "    vol: $(round(τvol, sigdigits=2)) Myr"
-	end
+        τvol = ustrip(Myr, norm(v) / norm(Ttest' * v) * s)
+        @test τvol > 1.0e6
+        @info "    vol: $(round(τvol, sigdigits = 2)) Myr"
+    end
 
     # tests if diagonal elements are > 0 and off-diagonal are < 0.
     diagT = sparse(Diagonal(T))
@@ -128,6 +126,6 @@
     SOmask = lat .< -35
     NAmask = @. (lat > 50) & ((lon < 100) | (250 < lon))
     mymask = repeat(.!SOmask .& .!NAmask, 1, 1, size(wet3D, 3))
-    LUMP, SPRAY, v_c = OceanTransportMatrixBuilder.lump_and_spray(wet3D, v, T, mymask; di=2, dj=2, dk=1)
+    LUMP, SPRAY, v_c = OceanTransportMatrixBuilder.lump_and_spray(wet3D, v, T, mymask; di = 2, dj = 2, dk = 1)
 
 end

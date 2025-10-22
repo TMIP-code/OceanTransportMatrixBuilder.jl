@@ -1,5 +1,3 @@
-
-
 abstract type ArakawaGridCell end
 
 struct AGridCell <: ArakawaGridCell
@@ -70,8 +68,8 @@ function getarakawagrid(u_lon, u_lat, v_lon, v_lat, gridmetrics)
 
     cell = (; C, SW, SE, NE, NW, S, N, W, E)
 
-    u_distances = (; (k => haversine(P, u_point) for (k,P) in pairs(cell))...)
-    v_distances = (; (k => haversine(P, v_point) for (k,P) in pairs(cell))...)
+    u_distances = (; (k => haversine(P, u_point) for (k, P) in pairs(cell))...)
+    v_distances = (; (k => haversine(P, v_point) for (k, P) in pairs(cell))...)
 
     u_distance, u_pos = findmin(u_distances)
     v_distance, v_pos = findmin(v_distances)
@@ -126,8 +124,8 @@ function interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, gridmetri
     # so that's what we do here
     u2 = replace(u, _FillValue => 0.0)
     v2 = replace(v, _FillValue => 0.0)
-    u2 = 0.5(u2 + [fill(0.0, nx, 1, nz);; u2[:, 1:end-1, :]])
-    v2 = 0.5(v2 + [fill(0.0, 1, ny, nz); v2[1:end-1, :, :]])
+    u2 = 0.5(u2 + [fill(0.0, nx, 1, nz);; u2[:, 1:(end - 1), :]])
+    v2 = 0.5(v2 + [fill(0.0, 1, ny, nz); v2[1:(end - 1), :, :]])
     SE_points = [(lon, lat) for (lon, lat) in zip(lon_vertices[2, :, :], lat_vertices[2, :, :])]
     NE_points = [(lon, lat) for (lon, lat) in zip(lon_vertices[3, :, :], lat_vertices[3, :, :])]
     NW_points = [(lon, lat) for (lon, lat) in zip(lon_vertices[4, :, :], lat_vertices[4, :, :])]
@@ -140,9 +138,6 @@ function interpolateontodefaultCgrid(u, u_lon, u_lat, v, v_lon, v_lat, gridmetri
     return u2, u2_lon, u2_lat, v2, v2_lon, v2_lat
 
 end
-
-
-
 
 
 """
@@ -167,8 +162,8 @@ function vertexpermutation(lon_vertices, lat_vertices)
     i = j = 1
     # Turn the vertices into points
     points = collect(zip(lon_vertices[:, i, j], lat_vertices[:, i, j]))
-    points_east = collect(zip(lon_vertices[:, i+1, j], lat_vertices[:, i+1, j]))
-    points_north = collect(zip(lon_vertices[:, i, j+1], lat_vertices[:, i, j+1]))
+    points_east = collect(zip(lon_vertices[:, i + 1, j], lat_vertices[:, i + 1, j]))
+    points_north = collect(zip(lon_vertices[:, i, j + 1], lat_vertices[:, i, j + 1]))
     # Find the common points
     common_east = Set(points) ∩ Set(points_east)
     common_noth = Set(points) ∩ Set(points_north)
@@ -181,8 +176,6 @@ function vertexpermutation(lon_vertices, lat_vertices)
     idx1 = only(setdiff(1:4, idx2, idx3, idx4)) # only in (i,j)
     return [idx1, idx2, idx3, idx4]
 end
-
-
 
 
 # distances
@@ -207,8 +200,6 @@ verticalindex(I::CartesianIndex{1}) = I
 verticalindex(I::CartesianIndex{3}) = CartesianIndex(I.I[3])
 
 
-
-
 # The default orientation is the following:
 #
 #     4 ────┐ 3
@@ -216,33 +207,33 @@ verticalindex(I::CartesianIndex{3}) = CartesianIndex(I.I[3])
 #     1 ────┘ 2
 #
 function vertexindices(dir)
-    dir == :south ? (1, 2) :
-    dir == :east ? (2, 3) :
-    dir == :north ? (3, 4) :
-    dir == :west ? (1, 4) :
-    error()
+    return dir == :south ? (1, 2) :
+        dir == :east ? (2, 3) :
+        dir == :north ? (3, 4) :
+        dir == :west ? (1, 4) :
+        error()
 end
-vertexpoint(vlon, vlat, i, j, vertexidx) = (vlon[vertexidx,i,j], vlat[vertexidx,i,j])
+vertexpoint(vlon, vlat, i, j, vertexidx) = (vlon[vertexidx, i, j], vlat[vertexidx, i, j])
 function verticalfacewidth(vlon, vlat, i, j, dir)
     a, b = vertexindices(dir)
     A = vertexpoint(vlon, vlat, i, j, a)
     B = vertexpoint(vlon, vlat, i, j, b)
-    haversine(A, B)
+    return haversine(A, B)
 end
 verticalfacewidth(edge_length_2D, i, j, dir) = edge_length_2D[dir][i, j]
 
 function verticalfacearea(vlon, vlat, lev_bnds_or_thkcello, i, j, k, dir)
     height = cellthickness(lev_bnds_or_thkcello, i, j, k)
     width = verticalfacewidth(vlon, vlat, i, j, dir)
-    height * width
+    return height * width
 end
 function verticalfacearea(edge_length_2D, lev_bnds_or_thkcello, i, j, k, dir)
     height = cellthickness(lev_bnds_or_thkcello, i, j, k)
     width = verticalfacewidth(edge_length_2D, i, j, dir)
-    height * width
+    return height * width
 end
 
-cellthickness(lev_bnds::Matrix, i, j, k) = abs(lev_bnds[2,k] - lev_bnds[1,k])
+cellthickness(lev_bnds::Matrix, i, j, k) = abs(lev_bnds[2, k] - lev_bnds[1, k])
 cellthickness(thkcello, i, j, k) = thkcello[i, j, k]
 
 
@@ -252,11 +243,11 @@ function centroid2edgedistance(lon, lat, vlon, vlat, i, j, dir)
     A = vertexpoint(vlon, vlat, i, j, a)
     B = vertexpoint(vlon, vlat, i, j, b)
     M = midpointonsphere(A, B)
-    haversine(C, M)
+    return haversine(C, M)
 end
 
 function midpointonsphere(A, B)
-    if abs(A[1] - B[1]) < 180
+    return if abs(A[1] - B[1]) < 180
         (A .+ B) ./ 2
     else # if the edge crosses the longitudinal edge of the map
         (A .+ B) ./ 2 .+ (180, 0)
@@ -271,8 +262,6 @@ function horizontalcentroiddistance(lon, lat, iA, jA, iB, jB)
 end
 
 
-
-
 function makegridmetrics(; areacello, volcello, lon, lat, lev, lon_vertices, lat_vertices)
 
     # Differences in output "missing" data is commonplace,
@@ -282,19 +271,19 @@ function makegridmetrics(; areacello, volcello, lon, lat, lev, lon_vertices, lat
     haskey(volcello.properties, "_FillValue") && push!(toreplace, volcello.properties["_FillValue"])
     replacelist = (x => NaN for x in toreplace)
 
-	# volume (3D)
+    # volume (3D)
     v3D = volcello |> Array{Union{Missing, Float64}}
-	v3D = replace(v3D, replacelist...)
+    v3D = replace(v3D, replacelist...)
 
     # area (2D)
     area2D = areacello |> Array{Union{Missing, Float64}}
     area2D = replace(area2D, replacelist...)
 
-	# depth and cell height (3D)
-	thkcello = v3D ./ area2D
+    # depth and cell height (3D)
+    thkcello = v3D ./ area2D
     ZBOT3D = cumsum(thkcello, dims = 3)
     Z3D = ZBOT3D - 0.5 * thkcello
-	zt = lev |> Array
+    zt = lev |> Array
 
     lat = lat |> Array
     lon = lon |> Array
@@ -305,8 +294,8 @@ function makegridmetrics(; areacello, volcello, lon, lat, lev, lon_vertices, lat
 
     # sort the vertices to match the default orientation
     vertexidx = vertexpermutation(lon_vertices, lat_vertices)
-    lon_vertices = lon_vertices[vertexidx,:,:]
-    lat_vertices = lat_vertices[vertexidx,:,:]
+    lon_vertices = lon_vertices[vertexidx, :, :]
+    lat_vertices = lat_vertices[vertexidx, :, :]
 
     C = CartesianIndices(size(lon))
 
@@ -314,10 +303,9 @@ function makegridmetrics(; areacello, volcello, lon, lat, lev, lon_vertices, lat
 
     dirs = (:south, :east, :north, :west)
     𝑗s = (j₋₁, i₊₁, j₊₁, i₋₁)
-    edge_length_2D = Dict(d=>[verticalfacewidth(lon_vertices, lat_vertices, 𝑖.I[1], 𝑖.I[2], d) for 𝑖 in C] for d in dirs)
-    distance_to_edge_2D = Dict(d=>[centroid2edgedistance(lon, lat, lon_vertices, lat_vertices, 𝑖.I[1], 𝑖.I[2], d) for 𝑖 in C] for d in dirs)
-    distance_to_neighbour_2D = Dict(d=>[horizontaldistance(lon, lat, 𝑖, 𝑗(𝑖, gridtopology)) for 𝑖 in C] for (d,𝑗) in zip(dirs,𝑗s))
+    edge_length_2D = Dict(d => [verticalfacewidth(lon_vertices, lat_vertices, 𝑖.I[1], 𝑖.I[2], d) for 𝑖 in C] for d in dirs)
+    distance_to_edge_2D = Dict(d => [centroid2edgedistance(lon, lat, lon_vertices, lat_vertices, 𝑖.I[1], 𝑖.I[2], d) for 𝑖 in C] for d in dirs)
+    distance_to_neighbour_2D = Dict(d => [horizontaldistance(lon, lat, 𝑖, 𝑗(𝑖, gridtopology)) for 𝑖 in C] for (d, 𝑗) in zip(dirs, 𝑗s))
 
-	return (; area2D, v3D, thkcello, lon_vertices, lat_vertices, lon, lat, Z3D, zt, edge_length_2D, distance_to_edge_2D, distance_to_neighbour_2D, gridtopology)
+    return (; area2D, v3D, thkcello, lon_vertices, lat_vertices, lon, lat, Z3D, zt, edge_length_2D, distance_to_edge_2D, distance_to_neighbour_2D, gridtopology)
 end
-

@@ -1,4 +1,3 @@
-
 @testmodule LocalBuiltMatrix begin
 
     using Test
@@ -88,7 +87,7 @@
     # Diffusivites
     κH = 500.0    # m^2/s
     κVML = 0.1    # m^2/s
-    κVdeep = 1e-5 # m^2/s
+    κVdeep = 1.0e-5 # m^2/s
 
     # Make indices
     indices = makeindices(gridmetrics.v3D)
@@ -105,7 +104,7 @@
     (; T, Tadv, TκH, TκVML, TκVdeep) = transportmatrix(; ϕ, mlotst, gridmetrics, indices, ρ, κH, κVML, κVdeep)
 
     Tsyms = (:T, :Tadv, :TκH, :TκVML, :TκVdeep)
-	for Ttest in (T, Tadv, TκH, TκVML, TκVdeep)
+    for Ttest in (T, Tadv, TκH, TκVML, TκVdeep)
         @test Ttest isa SparseMatrixCSC{Float64, Int}
     end
 
@@ -113,7 +112,7 @@
     (; T, Tadv, TκH, TκVML, TκVdeep) = transportmatrix(; ϕ, mlotst, gridmetrics, indices, ρ, κH, κVML, κVdeep, upwind = false)
 
     Tsyms = (:T, :Tadv, :TκH, :TκVML, :TκVdeep)
-	for Ttest in (T, Tadv, TκH, TκVML, TκVdeep)
+    for Ttest in (T, Tadv, TκH, TκVML, TκVdeep)
         @test Ttest isa SparseMatrixCSC{Float64, Int}
     end
 

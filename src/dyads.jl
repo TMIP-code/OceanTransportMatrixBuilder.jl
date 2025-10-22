@@ -1,5 +1,3 @@
-
-
 #########
 # DYADS #
 #########
@@ -78,4 +76,3 @@ function globalverticaldyadderivative(χ, gridmetrics, indices)
     end
     return ∂χ
 end
-

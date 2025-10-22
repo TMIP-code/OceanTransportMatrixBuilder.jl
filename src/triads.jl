@@ -1,8 +1,3 @@
-
-
-
-
-
 ###### TRIADS ######
 
 """
@@ -132,7 +127,7 @@ function localtriadderivative(vals::VerticalFaceTriadGroupValues, distances::Ver
         CES = Δvals.CE / Δvals.ESE,
     )
 
-    weights = (;(k => !isnan(v) for (k,v) in pairs(∂Eover∂N))...)
+    weights = (; (k => !isnan(v) for (k, v) in pairs(∂Eover∂N))...)
 
     return sum(w * v for (w, v) in zip(weights, ∂Eover∂N)) / sum(weights)
 end

@@ -35,7 +35,7 @@ where the lumping should occur.
 Outside of this region, no lumping.
 Default is `f=Returns(true)`, i.e. lump everywhere.
 """
-function lump_and_spray(wet3D, vol, T, mask=trues(size(wet3D)); di=2, dj=2, dk=1)
+function lump_and_spray(wet3D, vol, T, mask = trues(size(wet3D)); di = 2, dj = 2, dk = 1)
 
     # extend the grid to avoid lumping cells outside of bounds
     nxyz = size(wet3D)
@@ -53,7 +53,7 @@ function lump_and_spray(wet3D, vol, T, mask=trues(size(wet3D)); di=2, dj=2, dk=1
 
     # loop once over all grid cells and assign lumped indices
     c = 2 # index / counter (we start at 2 because 1 is reserved for dry cells)
-    neighbours = CartesianIndices((0:di-1, 0:dj-1, 0:dk-1))
+    neighbours = CartesianIndices((0:(di - 1), 0:(dj - 1), 0:(dk - 1)))
     for 𝑖 in eachindex(C)
         C𝑖 = C[𝑖]
         # skip if index already assigned and in mask
@@ -61,7 +61,7 @@ function lump_and_spray(wet3D, vol, T, mask=trues(size(wet3D)); di=2, dj=2, dk=1
         LUMPidx[C𝑖] > 0 && mask[C𝑖] && continue
         if mask[C𝑖] # if in region, assign all neighbours also in region
             # list of neighbours
-            L𝑖 = L[C𝑖 .+ neighbours][:]
+            L𝑖 = vec(L[C𝑖 .+ neighbours])
             # First, assign dry index to dry cells
             localwet = wet3Dext[L𝑖]
             dryidx = L𝑖[.!localwet]
@@ -105,12 +105,11 @@ function lump_and_spray(wet3D, vol, T, mask=trues(size(wet3D)); di=2, dj=2, dk=1
     nwet = size(LUMP, 2)
     nwet_c = size(LUMP, 1)
     @info """LUMP and SPRAY:
-    Matrix size reduction: $(round(100(1 - nwet_c/nwet)))% ($nwet -> $nwet_c)
+    Matrix size reduction: $(round(100(1 - nwet_c / nwet)))% ($nwet -> $nwet_c)
     """
 
     return LUMP, SPRAY, vol_c
 end
-
 
 
 """
@@ -120,8 +119,8 @@ as2D(x, wet3D)
 """
 function as2D(x, wet3D)
     x2D = fill(NaN, size(wet3D)[1:2])
-    @views x2D[wet3D[:,:,1]] .= x
-    x2D
+    @views x2D[wet3D[:, :, 1]] .= x
+    return x2D
 end
 
 """
@@ -132,26 +131,5 @@ as3D(x, wet3D)
 function as3D(x, wet3D)
     x3D = fill(NaN, size(wet3D))
     @views x3D[wet3D] .= x
-    x3D
+    return x3D
 end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
