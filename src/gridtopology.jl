@@ -44,6 +44,10 @@ function getgridtopology(lon_vertices, lat_vertices, lev)
     elseif isapprox_lon(NPlon, rot180(NPlon)) && isapprox(NPlat, rot180(NPlat))
         return TripolarGridTopology(nx, ny, nz)
     else
+        @warn """
+        Unknown grid topology detected. Things might not work as expected.
+        See `getgridtopology` function to see what failed the checks
+        """
         return UnknownGridTopology(nx, ny, nz)
     end
 end
