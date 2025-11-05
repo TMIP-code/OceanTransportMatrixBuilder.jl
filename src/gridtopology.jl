@@ -16,6 +16,16 @@ struct UnknownGridTopology <: AbstractGridTopology
 end
 
 """
+    isapprox_lon(a, b)
+
+Approximate equality for longitudes, taking into account the periodicity.
+"""
+function isapprox_lon(a, b)
+    Δ = @. mod(a - b + 180, 360) - 180
+    return isapprox(Δ, zeros(size(Δ)), atol = eps(180.0))
+end
+
+"""
     getgridtopology(lon_vertices, lat_vertices, lev)
 
 Returns the type of grid based on how the vertices connect at the north pole.
@@ -31,7 +41,7 @@ function getgridtopology(lon_vertices, lat_vertices, lev)
     if all(NPlat .== 90)
         return BipolarGridTopology(nx, ny, nz)
         # Otherwise check if the north pole is split in two
-    elseif isapprox(NPlon, rot180(NPlon)) && isapprox(NPlat, rot180(NPlat))
+    elseif isapprox_lon(NPlon, rot180(NPlon)) && isapprox(NPlat, rot180(NPlat))
         return TripolarGridTopology(nx, ny, nz)
     else
         return UnknownGridTopology(nx, ny, nz)
