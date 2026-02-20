@@ -28,7 +28,7 @@ include("RediGM.jl")
 # Extras
 include("extratools.jl") # <- I think this should be in a separate "base" repo
 
-export velocity2fluxes
+export velocity2fluxes, fluxes2velocity
 export facefluxesfrommasstransport
 export facefluxesfromvelocities
 export makegridmetrics

@@ -1,6 +1,6 @@
 name = "OceanTransportMatrixBuilder"
 uuid = "c2b4a04e-6049-4fc4-aa6a-5508a29a1e1c"
-version = "0.8.2"
+version = "0.8.3"
 authors = ["Benoit Pasquier <briochemc@gmail.com> and contributors"]
 
 [deps]

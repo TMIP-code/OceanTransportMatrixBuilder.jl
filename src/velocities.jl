@@ -39,6 +39,41 @@ function velocity2fluxes(u, u_lon, u_lat, v, v_lon, v_lat, gridmetrics, ρ)
 end
 
 """
+    fluxes2velocity(ϕᵢ, ϕⱼ, gridmetrics, ρ)
+
+Return the velocities `u` and `v` on the C-grid given the mass fluxes `ϕᵢ` and `ϕⱼ` (in kg/s).
+
+The velocities are calculated from the density ρ (number or 3D array) and from the cell face areas between the cells.
+The mean density from the two cells that share the face is used.
+The minimum thickness of the two cells that share the face is used.
+"""
+function fluxes2velocity(ϕᵢ, ϕⱼ, gridmetrics, ρ)
+
+    # Unpack gridmetrics
+    (; thkcello, edge_length_2D, v3D, lon_vertices, lat_vertices, zt) = gridmetrics
+
+    # make indices
+    indices = makeindices(v3D)
+
+    # grid type
+    gridtopology = getgridtopology(lon_vertices, lat_vertices, zt)
+
+    u = zeros(size(ϕᵢ))
+    v = zeros(size(ϕⱼ))
+
+    # Calculate velocities from fluxes
+    for 𝑖 in indices.C
+        i, j = 𝑖.I
+        𝑗 = i₊₁(𝑖, gridtopology) # grid cell to the "east"
+        u[𝑖] = ϕᵢ[𝑖] / (twocellnanmean(ρ, 𝑖, 𝑗) * twocellnanmin(thkcello, 𝑖, 𝑗) * edge_length_2D[:east][i, j])
+        𝑗 = j₊₁(𝑖, gridtopology) # grid cell to the "north"
+        v[𝑖] = ϕⱼ[𝑖] / (twocellnanmean(ρ, 𝑖, 𝑗) * twocellnanmin(thkcello, 𝑖, 𝑗) * edge_length_2D[:north][i, j])
+    end
+
+    return u, v
+end
+
+"""
     twocellnanmean(x, 𝑖, 𝑗)
 
 Return the nanmean of `x` at the two cell indices `𝑖` and `𝑗`.

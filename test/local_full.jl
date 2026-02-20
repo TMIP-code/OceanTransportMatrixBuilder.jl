@@ -297,4 +297,10 @@ end
         save(outputfile, fig)
     end
 
+    # Round-trip test: velocity → fluxes → velocity should recover the C-grid velocities
+    u_cgrid, _, _, v_cgrid, _, _ = OceanTransportMatrixBuilder.interpolateontodefaultCgrid(uo, uo_lon, uo_lat, vo, vo_lon, vo_lat, gridmetrics)
+    u_rec, v_rec = fluxes2velocity(umo_bis, vmo_bis, gridmetrics, ρ)
+    @test u_rec[wet3D] ≈ u_cgrid[wet3D]
+    @test v_rec[wet3D] ≈ v_cgrid[wet3D]
+
 end
