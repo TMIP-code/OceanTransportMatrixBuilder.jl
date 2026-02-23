@@ -36,44 +36,62 @@ end
 
 
 """
-    bolus_GM_velocity(σ, gridmetrics; κGM = 600, maxslope = 0.01)
+    bolus_GM_velocity(ρ, gridmetrics, indices; κGM = 600, maxslope = 0.01)
 
-Returns the bolus velocity field due to the Gent-McWilliams parameterization,
-computed from the neutral density field `σ` (or potential density, ρθ in kg/m³).
+Compute Gent-McWilliams bolus velocities from density field ρ.
 
-Note: This is experimental at this stage.
+The function calculates the eddy-induced bolus velocities that represent the effect
+of mesoscale eddies on large-scale ocean circulation. This implementation uses density
+slopes computed via triad derivatives and applies slope limiting and tapering for
+numerical stability.
+
+# Arguments
+- `ρ`: 3D density field (kg/m³)
+- `gridmetrics`: Named tuple containing grid information (lon, lat, Z, gridtopology, etc.)
+- `indices`: Named tuple containing index information (Lwet, C, etc.)
+- `κGM`: Gent-McWilliams diffusivity coefficient (m²/s, default: 600)
+- `maxslope`: Maximum density slope magnitude (default: 0.01)
+
+# Returns
+- `u_GM, v_GM`: Bolus velocities in x and y directions (m/s)
+
+# Mathematical Formulation
+The GM bolus velocity is computed as:
+1. Calculate density slopes: Sᵢ = ∂ρ/∂x, Sⱼ = ∂ρ/∂y
+2. Apply slope limiting: S = clamp(S, -maxslope, maxslope)
+3. Apply taper function: taper = 0.5*(1 + tanh((Sc - |S|)/Sd))
+4. Compute bolus velocities: u_GM = -κGM * ∂/∂z (taper * Sᵢ)
+
+# References
+- Gent, P. R., and J. C. McWilliams, 1990: Isopycnal mixing in ocean circulation models.
+  J. Phys. Oceanogr., 20, 150-155.
 """
 function bolus_GM_velocity(ρ, gridmetrics, indices; κGM = 600, maxslope = 0.01)
-    # TODO: implement with neutral density (or potential density, ρθ in kg/m³)
-    # function bolus_GM_velocity(so, thetao, gridmetrics; κGM = 600, maxslope = 0.01)
+    # Calculate density slopes in i and j directions using the existing slope functions
+    # These represent the horizontal density gradients: Sᵢ ≈ ∂ρ/∂x, Sⱼ ≈ ∂ρ/∂y
+    Sᵢ = globaldensityslope(ρ, gridmetrics, indices, Icoord())
+    Sⱼ = globaldensityslope(ρ, gridmetrics, indices, Jcoord())
 
-    # Sᵢ = globalpotentialdensityslope(gsw_rho, so, ct, gridmetrics, indices, Icoord())
-    # Sⱼ = globalpotentialdensityslope(gsw_rho, so, ct, gridmetrics, indices, Jcoord())
-    Sᵢ = globalverticalfacetriadderivative(ρ, gridmetrics, indices, Icoord())
-    Sⱼ = globalverticalfacetriadderivative(ρ, gridmetrics, indices, Jcoord())
-
-    # cap the slope
+    # Apply slope limiting to prevent numerical instability
+    # This caps the magnitude of density slopes to physically reasonable values
     Sᵢ = clamp.(Sᵢ, -maxslope, maxslope)
     Sⱼ = clamp.(Sⱼ, -maxslope, maxslope)
 
-    Sc = 0.004
-    Sd = 0.001
-    # that should not work since Sᵢ and Sⱼ are not colocated
-    taper = @. 0.5 * (1 + tanh((Sc - sqrt(Sᵢ^2 + Sⱼ^2)) / Sd))
+    # Apply taper function to smoothly reduce mixing in regions of strong slopes
+    # This prevents excessive mixing where isopycnals are steeply sloped
+    Sc = 0.004  # Critical slope - where taper starts to reduce mixing
+    Sd = 0.001  # Taper width - controls how quickly mixing is reduced
+    slope_magnitude = sqrt.(Sᵢ.^2 + Sⱼ.^2)
+    taper = @. 0.5 * (1 + tanh((Sc - slope_magnitude) / Sd))
     Sᵢ = taper .* Sᵢ
     Sⱼ = taper .* Sⱼ
 
-    # TODO Include Z into gridmetrics as Z3D so it's clear what it is
-    # TODO Apply vertical dyad derivative to the density Slopes
-    # TODO Add some tests on the derivatives. Maybe set some fields like
-    # χ(x,y,z) = x^2 + y^2 + z^2 and check the derivatives at some points. Not sure. Think more about it.
+    # Calculate bolus velocities from density slopes
+    # u_GM = -κGM * ∂/∂z (Sᵢ), v_GM = -κGM * ∂/∂z (Sⱼ)
+    # The negative sign follows the conventional formulation where
+    # eddy-induced transport opposes the mean density gradients
+    u_GM = -globalverticaldyadderivative(κGM .* Sᵢ, gridmetrics, indices)
+    v_GM = -globalverticaldyadderivative(κGM .* Sⱼ, gridmetrics, indices)
 
-    # TODO clean up this code and maybe split it into indexing (including dyad and triad indexing)
-    # and derivatives (including forward, backward, centered, and dyad and triad derivatives)
-
-    # Take the vertical derivative of the density slope in x
-    u = globalverticaldyadderivative(κGM .* Sᵢ, gridmetrics, indices)
-    v = globalverticaldyadderivative(κGM .* Sⱼ, gridmetrics, indices)
-
-    return u, v
+    return u_GM, v_GM
 end

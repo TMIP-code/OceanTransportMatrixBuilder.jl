@@ -120,6 +120,57 @@ function buildTκVdeep(; mlotst, gridmetrics, indices, κVdeep)
 end
 
 """
+    buildTGM(ρ, gridmetrics, indices; κGM = 600, maxslope = 0.01)
+
+Build the Gent-McWilliams transport operator from density field.
+
+# Arguments
+- `ρ`: 3D density field (kg/m³) for GM calculation
+- `gridmetrics`: Named tuple containing grid information
+- `indices`: Named tuple containing index information
+- `κGM`: Gent-McWilliams diffusivity coefficient (m²/s, default: 600)
+- `maxslope`: Maximum density slope magnitude (default: 0.01)
+
+# Returns
+- `TGM`: Sparse matrix operator for GM bolus transport
+"""
+function buildTGM(ρ, gridmetrics, indices; κGM = 600, maxslope = 0.01)
+    # Calculate GM bolus velocities from density field
+    u_GM, v_GM = bolus_GM_velocity(ρ, gridmetrics, indices; κGM, maxslope)
+
+    # For GM, we need to convert velocities to fluxes. Since GM velocities are
+    # defined on the same grid as the density field, we can use the gridmetrics
+    # to compute the fluxes directly.
+    # Extract necessary grid information
+    (; thkcello, edge_length_2D, v3D) = gridmetrics
+    mean_ρ = mean(skipmissing(ρ))
+
+    # Create flux fields with same size as velocity fields
+    ϕᵢ_GM = zeros(size(u_GM))
+    ϕⱼ_GM = zeros(size(v_GM))
+
+    # Convert velocities to fluxes: flux = velocity * density * area * thickness
+    # We need to handle the grid topology properly here
+    for 𝑖 in eachindex(u_GM)
+        i, j, k = indices.C[𝑖].I
+        # East flux: u_GM * mean_ρ * edge_length * min_thickness
+        ϕᵢ_GM[𝑖] = u_GM[𝑖] * mean_ρ * edge_length_2D[:east][i, j] * thkcello[i, j, k]
+        # North flux: v_GM * mean_ρ * edge_length * min_thickness
+        ϕⱼ_GM[𝑖] = v_GM[𝑖] * mean_ρ * edge_length_2D[:north][i, j] * thkcello[i, j, k]
+    end
+
+    # Build advection operator from GM fluxes
+    # This creates a transport operator that represents the eddy-induced
+    # bolus transport as an advection-like process
+    return buildTadv(;
+        ϕ = (east = ϕᵢ_GM, north = ϕⱼ_GM),
+        gridmetrics, indices,
+        ρ = mean_ρ,  # Use constant density for GM flux conversion
+        upwind = true
+    )
+end
+
+"""
     transportmatrix(; ϕ, mlotst, gridmetrics, indices, ρ, κH, κVML, κVdeep, Tadv, TκH, TκVML, TκVdeep, upwind)
 
 Build the transport matrix, i.e., the flux-divergence operator T = Tadv + TκH + TκVML + TκVdeep,
@@ -127,26 +178,38 @@ and check divergence and mass conservation.
 """
 function transportmatrix(;
         ϕ, mlotst, gridmetrics, indices, ρ,
+        ρ_GM = nothing,  # Density field for Gent-McWilliams parameterization (optional)
         κH = 500.0, # m^2/s,
         κVML = 0.1, # m^2/s,
         κVdeep = 1.0e-5, # m^2/s,
+        κGM = 600.0, # m^2/s - Gent-McWilliams diffusivity coefficient
+        maxslope = 0.01, # Maximum density slope for GM slope limiting
         Tadv = nothing,
         TκH = nothing,
         TκVML = nothing,
         TκVdeep = nothing,
+        TGM = nothing,  # Gent-McWilliams transport operator (optional)
         upwind = true,
     )
 
+    # Build standard transport operators
     isnothing(Tadv) && (Tadv = buildTadv(; ϕ, gridmetrics, indices, ρ, upwind))
     isnothing(TκH) && (TκH = buildTκH(; gridmetrics, indices, ρ, κH))
     isnothing(TκVML) && (TκVML = buildTκVML(; mlotst, gridmetrics, indices, κVML))
     isnothing(TκVdeep) && (TκVdeep = buildTκVdeep(; mlotst, gridmetrics, indices, κVdeep))
 
-    @debug "Building T"
+    # Build Gent-McWilliams operator if density field is provided
+    if !isnothing(ρ_GM)
+        isnothing(TGM) && (TGM = buildTGM(ρ_GM, gridmetrics, indices; κGM, maxslope))
+    else
+        TGM = spzeros(indices.N, indices.N)  # Zero operator if no GM
+    end
 
-    T = Tadv + TκH + TκVML + TκVdeep
+    @debug "Building transport matrix with GM contribution"
 
-    return (; T, Tadv, TκH, TκVML, TκVdeep)
+    T = Tadv + TκH + TκVML + TκVdeep + TGM
+
+    return (; T, Tadv, TκH, TκVML, TκVdeep, TGM)
 end
 
 

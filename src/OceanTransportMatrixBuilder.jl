@@ -34,5 +34,6 @@ export facefluxesfromvelocities
 export makegridmetrics
 export makeindices
 export transportmatrix
+export bolus_GM_velocity, buildTGM
 
 end
